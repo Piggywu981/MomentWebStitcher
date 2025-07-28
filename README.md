@@ -141,13 +141,9 @@ MomentWebStitcher/
 ├── script.js               # ⚙️ 核心JavaScript
 ├── package.json            # 📦 项目配置
 ├── README.md              # 📖 说明文档
-├── .github/
-│   └── workflows/
-│       └── deploy.yml     # 🚀 GitHub Actions部署配置
-└── MomentStitcher/        # 📁 原始Python版本（保留参考）
-    ├── gui_stitcher.py
-    ├── image_stitcher.py
-    └── ...
+└── .github/
+    └── workflows/
+        └── deploy.yml     # 🚀 GitHub Actions部署配置
 ```
 
 ## 🚀 部署指南
