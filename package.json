@@ -1,0 +1,24 @@
+{
+  "name": "moment-web-stitcher",
+  "version": "1.0.0",
+  "description": "Web version of MomentStitcher - A smart long image stitching tool for social media",
+  "main": "index.html",
+  "scripts": {
+    "dev": "python -m http.server 8000",
+    "build": "echo 'No build step required for static site'",
+    "deploy": "echo 'Deploy to GitHub Pages via GitHub Actions'"
+  },
+  "keywords": [
+    "image-stitching",
+    "web-app",
+    "social-media",
+    "image-processing"
+  ],
+  "author": "MomentStitcher Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Piggywu981/MomentWebStitcher"
+  },
+  "homepage": "https://Piggywu981.github.io/MomentWebStitcher"
+}
