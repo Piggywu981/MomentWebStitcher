@@ -141,7 +141,7 @@ http-server .
 
 ### 技术架构
 - **前端**: HTML5 + CSS3 + JavaScript (ES6+)
-- **图片处理**: Canvas API + Fabric.js
+- **图片处理**: Canvas API
 - **拖拽**: 原生Drag & Drop API + Touch Events API
 - **触屏优化**: 触觉反馈API (Vibration API) + 触摸手势识别
 - **响应式设计**: CSS Grid + Flexbox + 媒体查询
