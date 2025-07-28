@@ -58,22 +58,36 @@ header p {
 }
 
 .upload-area {
-    border: 2px dashed #667eea;
-    border-radius: 15px;
-    padding: 40px;
+    border: 3px dashed #667eea;
+    border-radius: 20px;
+    padding: 50px 30px;
     text-align: center;
     transition: all 0.3s ease;
     cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
 }
 
 .upload-area:hover {
     border-color: #764ba2;
     background-color: #f8f9ff;
+    transform: scale(1.02);
+}
+
+.upload-area:active {
+    transform: scale(0.98);
 }
 
 .upload-area.dragover {
     border-color: #764ba2;
     background-color: #f0f2ff;
+    transform: scale(1.02);
 }
 
 .upload-icon {
@@ -137,14 +151,27 @@ header p {
     background: #28a745;
     color: white;
     border: none;
-    padding: 10px 20px;
-    border-radius: 6px;
+    padding: 14px 28px;
+    border-radius: 8px;
     cursor: pointer;
-    transition: background 0.3s ease;
+    transition: all 0.3s ease;
+    font-size: 16px;
+    font-weight: 500;
+    min-height: 48px;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
 }
 
 .control-row button:hover {
     background: #218838;
+    transform: translateY(-1px);
+}
+
+.control-row button:active {
+    background: #1e7e34;
+    transform: translateY(0) scale(0.98);
 }
 
 .groups-container {
@@ -181,40 +208,56 @@ header p {
 
 .group-image {
     position: relative;
-    padding: 8px;
+    padding: 12px;
     background: white;
     border: 1px solid #ddd;
-    border-radius: 5px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     cursor: move;
+    cursor: grab;
+    cursor: -webkit-grab;
+    margin: 4px 0;
+    min-height: 60px;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 .group-image img {
-    width: 40px;
-    height: 40px;
+    width: 50px;
+    height: 50px;
     object-fit: cover;
-    border-radius: 4px;
+    border-radius: 6px;
+    flex-shrink: 0;
 }
 
 .group-image .filename {
     flex: 1;
-    font-size: 12px;
+    font-size: 14px;
     color: #666;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    line-height: 1.4;
 }
 
 .group-image .remove-btn {
     background: #dc3545;
     color: white;
     border: none;
-    padding: 4px 8px;
-    border-radius: 3px;
+    padding: 8px 12px;
+    border-radius: 6px;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 14px;
+    min-width: 32px;
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .preview-section {
@@ -319,12 +362,15 @@ header p {
 
 .pool-image {
     position: relative;
-    width: 80px;
-    height: 80px;
+    width: 90px;
+    height: 90px;
     border: 2px solid #ddd;
-    border-radius: 8px;
+    border-radius: 12px;
     overflow: hidden;
     cursor: move;
+    cursor: grab;
+    cursor: -webkit-grab;
+    margin: 5px;
 }
 
 .pool-image img {
@@ -335,25 +381,174 @@ header p {
 
 .pool-image .remove-btn {
     position: absolute;
-    top: 2px;
-    right: 2px;
-    background: rgba(220, 53, 69, 0.8);
+    top: 4px;
+    right: 4px;
+    background: rgba(220, 53, 69, 0.9);
     color: white;
     border: none;
-    padding: 2px 5px;
+    padding: 6px 8px;
     border-radius: 50%;
     cursor: pointer;
-    font-size: 10px;
+    font-size: 14px;
     line-height: 1;
+    min-width: 28px;
+    min-height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .dragging {
     opacity: 0.5;
+    transform: scale(1.1) rotate(3deg);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    transition: all 0.15s ease;
+    cursor: grabbing;
+    z-index: 1000;
 }
 
 .drag-over {
-    border-color: #667eea;
-    background-color: #f0f2ff;
+    background-color: rgba(66, 153, 225, 0.1);
+    transition: all 0.2s ease;
+    border-color: #4299e1;
+    box-shadow: inset 0 0 0 2px #4299e1;
+}
+
+.group-image.dragging {
+    opacity: 0.6;
+    transform: scale(1.05) rotate(2deg);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+.group-image.drag-placeholder {
+    border: 2px dashed #4299e1;
+    background-color: rgba(66, 153, 225, 0.1);
+    min-height: 80px;
+    margin: 4px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.group-images.sort-active {
+    border-color: #4299e1;
+    box-shadow: 0 0 0 1px rgba(66, 153, 225, 0.3);
+}
+
+.group-image.sort-indicator {
+    position: relative;
+}
+
+.group-image.sort-indicator::before {
+    content: '';
+    position: absolute;
+    left: -2px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 60%;
+    background: #4299e1;
+    border-radius: 2px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.group-image.sort-indicator:hover::before {
+    opacity: 1;
+}
+
+/* 拖拽动画 */
+.pool-image, .group-image {
+    transition: transform 0.15s ease, opacity 0.15s ease;
+    will-change: transform;
+    cursor: move;
+    cursor: grab;
+    cursor: -webkit-grab;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    -webkit-perspective: 1000px;
+    perspective: 1000px;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.pool-image:hover, .group-image:hover {
+    transform: translateY(-2px) translateZ(0);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.pool-image:active, .group-image:active {
+    cursor: grabbing;
+    cursor: -webkit-grabbing;
+}
+
+/* 优化动画性能 */
+.pool-image.drag-enter, .group-image.drag-enter {
+    animation: pulse 0.6s ease-in-out;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1) translateZ(0);
+    }
+    50% {
+        transform: scale(1.05) translateZ(0);
+    }
+    100% {
+        transform: scale(1) translateZ(0);
+    }
+}
+
+/* 放置时的平滑过渡优化 */
+.group-images {
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
+    min-height: 120px;
+    border: 2px dashed transparent;
+    border-radius: 8px;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    position: relative;
+}
+
+.group-images.drag-active {
+    background-color: rgba(66, 153, 225, 0.1);
+    border-color: rgba(66, 153, 225, 0.3);
+    box-shadow: inset 0 0 10px rgba(66, 153, 225, 0.1);
+    padding: 10px;
+}
+
+.group-images.drag-over {
+    min-height: 120px;
+    border: 2px dashed #4299e1;
+    background-color: rgba(66, 153, 225, 0.05);
+    transition: all 0.2s ease;
+}
+
+.group-images.drag-over::before {
+    content: '拖到这里添加到组';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #4299e1;
+    font-size: 14px;
+    pointer-events: none;
+}
+
+/* 减少重绘优化 */
+* {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* 图片懒加载占位符 */
+.pool-image img, .group-image img {
+    background: #f0f0f0;
+    min-height: 40px;
 }
 
 @media (max-width: 768px) {
@@ -365,19 +560,127 @@ header p {
     .right-panel {
         flex: none;
         width: 100%;
+        padding: 20px 15px;
     }
     
     .groups-container {
         grid-template-columns: 1fr;
+        gap: 20px;
     }
     
     .control-row {
         flex-direction: column;
         align-items: stretch;
+        gap: 15px;
     }
     
     .control-row input,
     .control-row button {
         width: 100%;
+        min-height: 50px;
+        font-size: 18px;
+    }
+    
+    .upload-area {
+        padding: 40px 20px;
+        margin: 0 -5px;
+    }
+    
+    .upload-icon {
+        font-size: 4em;
+    }
+    
+    .upload-area p {
+        font-size: 18px;
+        margin-bottom: 20px;
+    }
+    
+    .upload-area button {
+        font-size: 18px;
+        padding: 15px 30px;
+        min-height: 50px;
+    }
+    
+    .pool-image {
+        width: 100px;
+        height: 100px;
+        margin: 8px;
+    }
+    
+    .group-image {
+        padding: 16px;
+        margin: 8px 0;
+        min-height: 70px;
+    }
+    
+    .group-image img {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .group-image .filename {
+        font-size: 16px;
+    }
+    
+    .group-image .remove-btn {
+        padding: 10px 14px;
+        min-width: 40px;
+        min-height: 40px;
+        font-size: 16px;
+    }
+    
+    .pool-image .remove-btn {
+        padding: 8px 10px;
+        min-width: 32px;
+        min-height: 32px;
+        font-size: 16px;
+    }
+    
+    .group-box {
+        padding: 20px;
+    }
+    
+    .group-box h4 {
+        font-size: 16px;
+        padding: 12px;
+    }
+    
+    .group-box button {
+        font-size: 16px;
+        padding: 12px 24px;
+        min-height: 48px;
+    }
+}
+
+/* 超小屏幕优化 */
+@media (max-width: 480px) {
+    body {
+        padding: 10px;
+    }
+    
+    .container {
+        border-radius: 15px;
+    }
+    
+    header {
+        padding: 20px 15px;
+    }
+    
+    header h1 {
+        font-size: 2em;
+    }
+    
+    header p {
+        font-size: 1.1em;
+    }
+    
+    .pool-images {
+        gap: 15px;
+        justify-content: center;
+    }
+    
+    .pool-image {
+        width: 110px;
+        height: 110px;
     }
 }
