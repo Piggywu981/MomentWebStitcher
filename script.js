@@ -884,9 +884,3 @@ function downloadImage(imageUrl, filename) {
     // 清理blob URL
     setTimeout(() => URL.revokeObjectURL(imageUrl), 1000);
 }
-
-// 预览功能
-function updatePreview() {
-    // 可以添加实时预览功能
-    // 这里简化处理，实际可以显示第一张图片的预览
-}
