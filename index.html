@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MomentStitcher - 朋友圈长图拼接工具</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎯 MomentStitcher</h1>
+            <p>专为朋友圈设计的智能长图拼接工具</p>
+        </header>
+
+        <div class="main-content">
+            <!-- 左侧：图片上传和分组 -->
+            <div class="left-panel">
+                <div class="upload-section">
+                    <div class="upload-area" id="uploadArea">
+                        <div class="upload-icon">📁</div>
+                        <p>拖拽图片到此处或点击选择</p>
+                        <input type="file" id="fileInput" multiple accept="image/*" style="display: none;">
+                        <button onclick="document.getElementById('fileInput').click()">选择图片</button>
+                    </div>
+                </div>
+
+                <div class="group-control">
+                    <h3>分组设置</h3>
+                    <div class="control-row">
+                        <label>每组图片数量：</label>
+                        <input type="number" id="groupSize" value="9" min="1" max="100">
+                        <button onclick="autoGroup()">自动分组</button>
+                    </div>
+                </div>
+
+                <div class="groups-container" id="groupsContainer">
+                    <!-- 动态生成分组 -->
+                </div>
+            </div>
+
+            <!-- 右侧：预览和输出 -->
+            <div class="right-panel">
+                <div class="preview-section">
+                    <h3>预览</h3>
+                    <div class="preview-container">
+                        <canvas id="previewCanvas"></canvas>
+                    </div>
+                </div>
+
+                <div class="output-section">
+                    <h3>输出设置</h3>
+                    <div class="control-row">
+                        <label>输出质量：</label>
+                        <input type="range" id="qualitySlider" min="70" max="100" value="95">
+                        <span id="qualityValue">95%</span>
+                    </div>
+                    <button id="stitchBtn" onclick="startStitching()" disabled>开始拼图</button>
+                    <button onclick="clearAll()">清空所有</button>
+                </div>
+
+                <div class="progress-section">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <p id="progressText">准备就绪</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 图片池 -->
+        <div class="image-pool" id="imagePool">
+            <h3>待分组图片</h3>
+            <div class="pool-images" id="poolImages"></div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
