@@ -26,13 +26,20 @@ self.onmessage = async (e: MessageEvent<StitchMessage>) => {
   }
 }
 
+interface ScaledImage {
+  bitmap: ImageBitmap
+  originalWidth: number
+  originalHeight: number
+  scaledHeight: number
+}
+
 async function stitchImages(
   imageSources: string[],
   quality: number,
   format: string,
   onProgress: (progress: ProcessingProgress) => void
 ): Promise<StitchResult> {
-  const imageElements: HTMLImageElement[] = []
+  const imageBitmaps: ScaledImage[] = []
   let minWidth = Infinity
   let totalHeight = 0
 
@@ -40,9 +47,14 @@ async function stitchImages(
   onProgress({ current: 0, total: imageSources.length, message: '加载图片中...' })
 
   for (let i = 0; i < imageSources.length; i++) {
-    const img = await loadImage(imageSources[i])
-    imageElements.push(img)
-    minWidth = Math.min(minWidth, img.width)
+    const { bitmap, width, height } = await loadImage(imageSources[i])
+    imageBitmaps.push({
+      bitmap,
+      originalWidth: width,
+      originalHeight: height,
+      scaledHeight: height,
+    })
+    minWidth = Math.min(minWidth, width)
     onProgress({
       current: i + 1,
       total: imageSources.length,
@@ -51,14 +63,13 @@ async function stitchImages(
   }
 
   // Calculate scaled dimensions
-  const scaledImages = imageElements.map((img) => {
-    const scale = minWidth / img.width
-    const newHeight = Math.round(img.height * scale)
-    totalHeight += newHeight
-    return { img, newHeight }
+  imageBitmaps.forEach((img) => {
+    const scale = minWidth / img.originalWidth
+    img.scaledHeight = Math.round(img.originalHeight * scale)
+    totalHeight += img.scaledHeight
   })
 
-  // Create canvas
+  // Create canvas using OffscreenCanvas
   const canvas = new OffscreenCanvas(minWidth, totalHeight)
   const ctx = canvas.getContext('2d')
   if (!ctx) {
@@ -70,18 +81,18 @@ async function stitchImages(
   ctx.fillRect(0, 0, canvas.width, canvas.height)
 
   // Draw images
-  onProgress({ current: 0, total: scaledImages.length, message: '拼接图片中...' })
+  onProgress({ current: 0, total: imageBitmaps.length, message: '拼接图片中...' })
 
   let yOffset = 0
-  for (let i = 0; i < scaledImages.length; i++) {
-    const { img, newHeight } = scaledImages[i]
-    ctx.drawImage(img, 0, yOffset, minWidth, newHeight)
-    yOffset += newHeight
+  for (let i = 0; i < imageBitmaps.length; i++) {
+    const { bitmap, scaledHeight } = imageBitmaps[i]
+    ctx.drawImage(bitmap, 0, yOffset, minWidth, scaledHeight)
+    yOffset += scaledHeight
 
     onProgress({
       current: i + 1,
-      total: scaledImages.length,
-      message: `拼接图片 ${i + 1}/${scaledImages.length}`,
+      total: imageBitmaps.length,
+      message: `拼接图片 ${i + 1}/${imageBitmaps.length}`,
     })
   }
 
@@ -102,14 +113,20 @@ async function stitchImages(
   }
 }
 
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => resolve(img)
-    img.onerror = () => reject(new Error(`Failed to load image: ${src}`))
-    img.src = src
-  })
+async function loadImage(src: string): Promise<{ bitmap: ImageBitmap; width: number; height: number }> {
+  const response = await fetch(src)
+  if (!response.ok) {
+    throw new Error(`Failed to fetch image: ${src}`)
+  }
+
+  const blob = await response.blob()
+  const bitmap = await createImageBitmap(blob)
+
+  return {
+    bitmap,
+    width: bitmap.width,
+    height: bitmap.height,
+  }
 }
 
 export {}
