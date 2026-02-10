@@ -1,5 +1,4 @@
 import type { StitchResult, ProcessingProgress } from '@/types'
-import ImageProcessorWorker from '@/workers/imageProcessor?worker'
 
 class ImageProcessor {
   private worker: Worker | null = null
@@ -19,7 +18,9 @@ class ImageProcessor {
 
     return new Promise((resolve, reject) => {
       try {
-        this.worker = new ImageProcessorWorker()
+        this.worker = new Worker(new URL('@/workers/imageProcessor.ts', import.meta.url), {
+          type: 'module',
+        })
 
         this.worker.onmessage = (e: MessageEvent) => {
           const { type, progress, result, error } = e.data

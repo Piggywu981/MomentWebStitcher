@@ -10,9 +10,11 @@ interface StoredState {
 class Storage {
   private db: IDBDatabase | null = null
   private dbReady: Promise<void>
+  private isIndexedDBAvailable: boolean
 
   constructor() {
-    this.dbReady = this.initDB()
+    this.isIndexedDBAvailable = typeof indexedDB !== 'undefined'
+    this.dbReady = this.isIndexedDBAvailable ? this.initDB() : Promise.resolve()
   }
 
   private async initDB(): Promise<void> {
@@ -40,6 +42,7 @@ class Storage {
   }
 
   async saveImage(image: ImageItem): Promise<void> {
+    if (!this.isIndexedDBAvailable) return
     await this.dbReady
     if (!this.db) return
 
@@ -54,6 +57,7 @@ class Storage {
   }
 
   async getImage(id: string): Promise<ImageItem | null> {
+    if (!this.isIndexedDBAvailable) return null
     await this.dbReady
     if (!this.db) return null
 
@@ -68,6 +72,7 @@ class Storage {
   }
 
   async deleteImage(id: string): Promise<void> {
+    if (!this.isIndexedDBAvailable) return
     await this.dbReady
     if (!this.db) return
 
@@ -82,6 +87,7 @@ class Storage {
   }
 
   async saveThumbnail(id: string, thumbnail: string): Promise<void> {
+    if (!this.isIndexedDBAvailable) return
     await this.dbReady
     if (!this.db) return
 
@@ -96,6 +102,7 @@ class Storage {
   }
 
   async getThumbnail(id: string): Promise<string | null> {
+    if (!this.isIndexedDBAvailable) return null
     await this.dbReady
     if (!this.db) return null
 

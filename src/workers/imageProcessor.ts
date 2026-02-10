@@ -7,23 +7,6 @@ interface StitchMessage {
   format: string
 }
 
-interface ProgressMessage {
-  type: 'progress'
-  progress: ProcessingProgress
-}
-
-interface CompleteMessage {
-  type: 'complete'
-  result: StitchResult
-}
-
-interface ErrorMessage {
-  type: 'error'
-  error: string
-}
-
-type WorkerMessage = ProgressMessage | CompleteMessage | ErrorMessage
-
 self.onmessage = async (e: MessageEvent<StitchMessage>) => {
   const { type, images, quality, format } = e.data
 
@@ -31,15 +14,15 @@ self.onmessage = async (e: MessageEvent<StitchMessage>) => {
 
   try {
     const result = await stitchImages(images, quality, format, (progress) => {
-      self.postMessage({ type: 'progress', progress } as ProgressMessage)
+      self.postMessage({ type: 'progress', progress })
     })
 
-    self.postMessage({ type: 'complete', result } as CompleteMessage)
+    self.postMessage({ type: 'complete', result })
   } catch (error) {
     self.postMessage({
       type: 'error',
       error: error instanceof Error ? error.message : 'Unknown error',
-    } as ErrorMessage)
+    })
   }
 }
 

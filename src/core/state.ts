@@ -1,6 +1,6 @@
 import type { AppState as IAppState, ImageItem, ImageGroup, AppSettings } from '@/types'
 import { DEFAULT_SETTINGS } from '@/utils/constants'
-import { CommandManager } from './commands'
+import { CommandManager, createAddImagesCommand, createRemoveImageCommand, createCreateGroupCommand, createDeleteGroupCommand, createAddToGroupCommand, createRemoveFromGroupCommand, createClearAllCommand } from './commands'
 import { eventBus, Events } from './events'
 import { storage } from './storage'
 
@@ -22,17 +22,14 @@ export class AppState implements IAppState {
 
   // Images
   addImages(images: ImageItem[]): void {
-    this.images.push(...images)
-    this.emitChange()
+    const command = createAddImagesCommand(this, images)
+    this.commandManager.execute(command)
     eventBus.emit(Events.IMAGES_ADDED, images)
   }
 
   removeImage(imageId: string): void {
-    this.images = this.images.filter((img) => img.id !== imageId)
-    this.groups.forEach((group) => {
-      group.images = group.images.filter((img) => img.id !== imageId)
-    })
-    this.emitChange()
+    const command = createRemoveImageCommand(this, imageId)
+    this.commandManager.execute(command)
     eventBus.emit(Events.IMAGES_REMOVED, imageId)
   }
 
@@ -43,37 +40,27 @@ export class AppState implements IAppState {
       name: name || `分组 ${this.groups.length + 1}`,
       images: [],
     }
-    this.groups.push(group)
-    this.emitChange()
+    const command = createCreateGroupCommand(this, group)
+    this.commandManager.execute(command)
     eventBus.emit(Events.GROUP_CREATED, group)
     return group
   }
 
   deleteGroup(groupId: string): void {
-    this.groups = this.groups.filter((g) => g.id !== groupId)
-    this.emitChange()
+    const command = createDeleteGroupCommand(this, groupId)
+    this.commandManager.execute(command)
     eventBus.emit(Events.GROUP_DELETED, groupId)
   }
 
   addImageToGroup(groupId: string, image: ImageItem, position?: number): void {
-    const group = this.groups.find((g) => g.id === groupId)
-    if (!group) return
-
-    if (position !== undefined && position >= 0) {
-      group.images.splice(position, 0, image)
-    } else {
-      group.images.push(image)
-    }
-    this.emitChange()
+    const command = createAddToGroupCommand(this, groupId, image, position)
+    this.commandManager.execute(command)
     eventBus.emit(Events.IMAGE_ADDED_TO_GROUP, { groupId, image })
   }
 
   removeImageFromGroup(groupId: string, imageId: string): void {
-    const group = this.groups.find((g) => g.id === groupId)
-    if (!group) return
-
-    group.images = group.images.filter((img) => img.id !== imageId)
-    this.emitChange()
+    const command = createRemoveFromGroupCommand(this, groupId, imageId)
+    this.commandManager.execute(command)
     eventBus.emit(Events.IMAGE_REMOVED_FROM_GROUP, { groupId, imageId })
   }
 
@@ -198,16 +185,12 @@ export class AppState implements IAppState {
 
   // Clear all
   clearAll(): void {
-    this.images = []
-    this.groups = []
-    this.progress = 0
-    this.currentTask = ''
-    this.commandManager.clear()
-    this.emitChange()
+    const command = createClearAllCommand(this)
+    this.commandManager.execute(command)
     eventBus.emit(Events.STATE_RESET)
   }
 
-  private emitChange(): void {
+  emitChange(): void {
     eventBus.emit(Events.STATE_CHANGED, this.getState())
   }
 
