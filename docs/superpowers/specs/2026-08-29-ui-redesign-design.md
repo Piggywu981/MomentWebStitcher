@@ -77,7 +77,7 @@
 
 ## 5. 实时迷你预览
 
-- **渲染单元**：每张分组卡片头部一个 `<canvas>`，逻辑宽 40px（×devicePixelRatio 取整），高按组内容纵横比自适应，上限 160px 超出内部滚动
+- **渲染单元**：每张分组卡片头部一个 `<canvas>`，逻辑宽 40px（×devicePixelRatio 取整），CSS 高度固定 120px，长图超出部分裁剪只显示前段（完整查看走全屏预览浮层）
 - **触发**：`insertImageIntoGroup` / `removeImageFromGroups` / `removeImage` / `clearGroup` / `clearAll` / `updateGroupOrder` 后，防抖 250ms 重画受影响组（质量滑块只影响导出压缩率，不改变预览像素，不触发重画）
 - **性能**：图片解码按 `image.id` 全局缓存复用；渲染带代数计数器，新渲染请求取消挂起的旧渲染；单组重画只动自己的 canvas
 - **空态**：组内 0 张不渲染（组已被清理）；1 张时显示「再选 1 张即可拼接」提示条
