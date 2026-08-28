@@ -772,6 +772,7 @@ function updateGroups() {
     container.appendChild(fragment);
     
     updateStitchButton();
+    imageGroups.forEach((_, index) => scheduleMiniPreview(index));
 }
 
 // 把图片插入到指定组内 beforeId 之前（beforeId 为空表示追加到末尾）
@@ -852,6 +853,70 @@ function updateStitchButton() {
     document.getElementById('stitchBtn').disabled = !hasGroups;
 }
 
+// ===== 迷你实时预览 =====
+const MINI_WIDTH = 40;
+const previewDecodeCache = new Map();   // image.id -> HTMLImageElement
+const previewGen = new Map();           // groupIndex -> 渲染代数（丢旧保新）
+const previewTimers = new Map();        // groupIndex -> 防抖 timer
+const previewRenderCount = new Map();   // groupIndex -> 累计渲染次数（DOM 重建也不丢）
+
+function getDecodedImage(imageData) {
+    const key = String(imageData.id);
+    if (previewDecodeCache.has(key)) return Promise.resolve(previewDecodeCache.get(key));
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => { previewDecodeCache.set(key, img); resolve(img); };
+        img.onerror = reject;
+        img.src = imageData.src;
+    });
+}
+
+function scheduleMiniPreview(groupIndex) {
+    clearTimeout(previewTimers.get(groupIndex));
+    previewTimers.set(groupIndex, setTimeout(() => renderMiniPreview(groupIndex), 250));
+}
+
+async function renderMiniPreview(groupIndex) {
+    const box = document.querySelector(`.group-box[data-group-index="${groupIndex}"]`);
+    const canvas = box && box.querySelector('.mini-preview');
+    if (!canvas) return;
+    const group = imageGroups[groupIndex] || [];
+    const gen = (previewGen.get(groupIndex) || 0) + 1;
+    previewGen.set(groupIndex, gen);
+    try {
+        const imgs = await Promise.all(group.map(getDecodedImage));
+        if (previewGen.get(groupIndex) !== gen) return; // 期间又变了，丢旧保新
+        const renderNo = (previewRenderCount.get(groupIndex) || 0) + 1;
+        previewRenderCount.set(groupIndex, renderNo);
+        canvas.dataset.renders = String(renderNo);
+        if (imgs.length < 2) return; // 单图/空组不渲染，张数由 badge 表达
+        let minWidth = Infinity;
+        imgs.forEach(img => { minWidth = Math.min(minWidth, img.naturalWidth); });
+        const outputWidth = Math.min(minWidth, MAX_OUTPUT_WIDTH);
+        const { rows, totalHeight } = computeStitchLayout(
+            imgs.map(img => ({ img, originalWidth: img.naturalWidth, originalHeight: img.naturalHeight })),
+            outputWidth);
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const w = MINI_WIDTH * dpr;
+        const hMax = 120 * dpr;
+        const scale = w / outputWidth;
+        canvas.width = w;
+        canvas.height = Math.min(Math.round(totalHeight * scale), hMax);
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        let y = 0;
+        rows.forEach(({ img, drawHeight }) => {
+            if (y >= canvas.height) return;
+            const h = drawHeight * scale;
+            const clipped = Math.min(h, canvas.height - y);
+            ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight * (clipped / h), 0, y, w, clipped);
+            y += clipped;
+        });
+        canvas.title = `输出 ${outputWidth} × ${totalHeight} px`;
+    } catch (e) { /* 解码失败：磁贴本身可见为 broken，预览静默跳过 */ }
+}
+
 // 开始拼接
 async function startStitching() {
     if (isStitching) return;
@@ -906,6 +971,15 @@ async function startStitching() {
     }
 }
 
+// 布局计算：预览与导出共用，保证所见即所得
+function computeStitchLayout(imgList, outputWidth) {
+    const rows = imgList.map(({ img, originalWidth, originalHeight }) => ({
+        img,
+        drawHeight: Math.max(1, Math.round(originalHeight * outputWidth / originalWidth)),
+    }));
+    return { rows, totalHeight: rows.reduce((s, r) => s + r.drawHeight, 0) };
+}
+
 // 拼接图片
 async function stitchImages(images, quality) {
     return new Promise((resolve, reject) => {
@@ -938,23 +1012,23 @@ async function stitchImages(images, quality) {
             // 按原始顺序排序
             imageElements.sort((a, b) => a.index - b.index);
             
-            // 计算指定输出宽度下的总高度
-            const heightAt = (width) => imageElements.reduce((sum, { originalWidth, originalHeight }) =>
-                sum + Math.max(1, Math.round(originalHeight * width / originalWidth)), 0);
-            
             // 输出宽度：取最小原图宽（保证不放大），并钳制到 1080 以内
             let outputWidth = Math.min(minWidth, MAX_OUTPUT_WIDTH);
             
             // 总面积超限时等比缩小整条长图，规避移动端 canvas 尺寸上限
+            const heightAt = (width) => imageElements.reduce((sum, { originalWidth, originalHeight }) =>
+                sum + Math.max(1, Math.round(originalHeight * width / originalWidth)), 0);
             if (outputWidth * heightAt(outputWidth) > MAX_CANVAS_AREA) {
                 outputWidth = Math.max(1, Math.floor(
                     outputWidth * Math.sqrt(MAX_CANVAS_AREA / (outputWidth * heightAt(outputWidth)))
                 ));
             }
             
+            const { rows, totalHeight } = computeStitchLayout(imageElements, outputWidth);
+            
             // 设置canvas尺寸
             canvas.width = outputWidth;
-            canvas.height = heightAt(outputWidth);
+            canvas.height = totalHeight;
             
             // 绘制白色背景
             ctx.fillStyle = 'white';
@@ -962,8 +1036,7 @@ async function stitchImages(images, quality) {
             
             // 拼接图片
             let yOffset = 0;
-            imageElements.forEach(({ img, originalWidth, originalHeight }) => {
-                const drawHeight = Math.max(1, Math.round(originalHeight * outputWidth / originalWidth));
+            rows.forEach(({ img, drawHeight }) => {
                 ctx.drawImage(img, 0, yOffset, outputWidth, drawHeight);
                 yOffset += drawHeight;
             });

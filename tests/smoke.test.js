@@ -360,6 +360,36 @@ function startServer() {
     const scrollAfter = await page.evaluate(() => window.scrollY);
     results.push({ name: 'T8 page scrolled natively (info)', pass: true, extra: `scrollY ${scrollBefore} -> ${scrollAfter}` });
 
+    // T11 迷你实时预览
+    await page.evaluate(() => clearAll());
+    await page.evaluate(async () => {
+        const mk = async (name, lm) => {
+            const c = document.createElement('canvas'); c.width = 80; c.height = 100;
+            const g = c.getContext('2d'); g.fillStyle = '#883355'; g.fillRect(0, 0, 80, 100);
+            const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+            handleImageUpload([new File([blob], name, { type: 'image/png', lastModified: lm })]);
+        };
+        await mk('p1.png', 1700000000000);
+        await mk('p2.png', 1700000100000);
+    });
+    await page.waitForFunction(() => uploadedImages.length === 2, null, { timeout: 8000 });
+    await page.waitForTimeout(400);
+    await page.fill('#groupSize', '2');
+    await page.click('#autoGroupBtn');
+    await page.waitForFunction(() =>
+        document.querySelectorAll('.mini-preview').length >= 1 &&
+        parseInt(document.querySelector('.mini-preview').dataset.renders || '0') >= 1,
+        null, { timeout: 5000 });
+    check('T11 mini preview canvas rendered', true);
+    const rendersBefore = await page.evaluate(() => parseInt(document.querySelector('.mini-preview').dataset.renders));
+    // 拖一张出组 => 迷你条应重画
+    await page.evaluate(() => {
+        __dnd('.group-images[data-group-index="0"] .group-image:nth-child(2)', '#poolImages');
+    });
+    await page.waitForTimeout(600);
+    check('T11 mini preview re-renders after drag', await page.evaluate(n =>
+        parseInt(document.querySelector('.mini-preview').dataset.renders) > n, rendersBefore));
+
     // T9 清空所有
     await page.evaluate(() => clearAll());
     check('T9 clearAll empties all', await page.evaluate(() =>
