@@ -390,6 +390,35 @@ function startServer() {
     check('T11 mini preview re-renders after drag', await page.evaluate(n =>
         parseInt(document.querySelector('.mini-preview').dataset.renders) > n, rendersBefore));
 
+    // T12 全屏预览浮层
+    await page.evaluate(() => clearAll());
+    await page.evaluate(async () => {
+        const mk = async (name, lm) => {
+            const c = document.createElement('canvas'); c.width = 80; c.height = 100;
+            const g = c.getContext('2d'); g.fillStyle = '#335588'; g.fillRect(0, 0, 80, 100);
+            const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+            handleImageUpload([new File([blob], name, { type: 'image/png', lastModified: lm })]);
+        };
+        await mk('f1.png', 1700000000000);
+        await mk('f2.png', 1700000100000);
+    });
+    await page.waitForFunction(() => uploadedImages.length === 2, null, { timeout: 8000 });
+    await page.waitForTimeout(400);
+    await page.fill('#groupSize', '2');
+    await page.click('#autoGroupBtn');
+    await page.waitForTimeout(600);
+    await page.click('.group-box:first-child .expand-preview');
+    await page.waitForTimeout(400);
+    check('T12 overlay opens with render', await page.evaluate(() =>
+        !document.getElementById('previewOverlay').hidden &&
+        parseInt(document.getElementById('previewCanvas').dataset.renders || '0') >= 1));
+    check('T12 dims shown', await page.evaluate(() =>
+        /输出 \d+ × \d+ px/.test(document.getElementById('previewDims').textContent)));
+    await page.click('#previewClose');
+    await page.waitForTimeout(200);
+    check('T12 overlay closes', await page.evaluate(() =>
+        document.getElementById('previewOverlay').hidden));
+
     // T9 清空所有
     await page.evaluate(() => clearAll());
     check('T9 clearAll empties all', await page.evaluate(() =>

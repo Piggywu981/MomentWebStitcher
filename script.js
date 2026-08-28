@@ -69,6 +69,7 @@ function initializeApp() {
     setupDragAndDropGroups();
     setupButtons();
     setupBottomBar();
+    setupPreviewOverlay();
 }
 
 // 底部抽屉（移动端参数面板开合）
@@ -81,8 +82,73 @@ function setupBottomBar() {
     });
 }
 
-// 全屏预览占位（任务 3 实现真身）
-function openPreview(groupIndex) {}
+// ===== 全屏预览浮层 =====
+const PREVIEW_RENDER_WIDTH = 480;
+let previewCurrent = 0;
+
+async function openPreview(groupIndex) {
+    if (!imageGroups.length) return;
+    previewCurrent = Math.min(Math.max(groupIndex, 0), imageGroups.length - 1);
+    document.getElementById('previewOverlay').hidden = false;
+    await renderFullPreview();
+}
+
+async function renderFullPreview() {
+    const canvas = document.getElementById('previewCanvas');
+    const group = imageGroups[previewCurrent] || [];
+    document.getElementById('previewTitle').textContent = `第 ${previewCurrent + 1} 组 · ${group.length} 张`;
+    document.getElementById('previewDims').textContent = '';
+    const gen = (previewGen.get('full') || 0) + 1;
+    previewGen.set('full', gen);
+    try {
+        const imgs = await Promise.all(group.map(getDecodedImage));
+        if (previewGen.get('full') !== gen) return;
+        if (imgs.length < 2) {
+            canvas.width = canvas.height = 0;
+            document.getElementById('previewDims').textContent = '再选 1 张即可拼接';
+            return;
+        }
+        let minWidth = Infinity;
+        imgs.forEach(img => { minWidth = Math.min(minWidth, img.naturalWidth); });
+        const outputWidth = Math.min(minWidth, MAX_OUTPUT_WIDTH);
+        const { rows, totalHeight } = computeStitchLayout(
+            imgs.map(img => ({ img, originalWidth: img.naturalWidth, originalHeight: img.naturalHeight })),
+            outputWidth);
+        const scale = PREVIEW_RENDER_WIDTH / outputWidth;
+        canvas.width = PREVIEW_RENDER_WIDTH;
+        canvas.height = Math.round(totalHeight * scale);
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        let y = 0;
+        rows.forEach(({ img, drawHeight }) => {
+            ctx.drawImage(img, 0, y, PREVIEW_RENDER_WIDTH, drawHeight * scale);
+            y += drawHeight * scale;
+        });
+        document.getElementById('previewDims').textContent = `输出 ${outputWidth} × ${totalHeight} px`;
+        canvas.dataset.renders = String((parseInt(canvas.dataset.renders) || 0) + 1);
+    } catch (e) { /* 同迷你预览，静默跳过 */ }
+}
+
+function setupPreviewOverlay() {
+    document.getElementById('previewClose').addEventListener('click', () => {
+        document.getElementById('previewOverlay').hidden = true;
+    });
+    document.getElementById('previewOverlay').addEventListener('click', function(e) {
+        if (e.target === this) this.hidden = true; // 点背景关闭
+    });
+    document.getElementById('previewPrev').addEventListener('click', () => {
+        if (previewCurrent > 0) { previewCurrent--; renderFullPreview(); }
+    });
+    document.getElementById('previewNext').addEventListener('click', () => {
+        if (previewCurrent < imageGroups.length - 1) { previewCurrent++; renderFullPreview(); }
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !document.getElementById('previewOverlay').hidden) {
+            document.getElementById('previewOverlay').hidden = true;
+        }
+    });
+}
 
 // 拖拽上传设置
 function setupDragAndDrop() {
