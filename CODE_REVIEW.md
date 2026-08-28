@@ -157,3 +157,31 @@ R1 → R2 → R4 → R5 → R6 → R8 → R14 → R7 → R3 → R9 → R11 / R16
 | T7 | `clearAll` 清空数据、图片池与分组 DOM | ✅ |
 
 全程无 console error / pageerror。另外 `node --check script.js` 语法校验通过。
+
+## 第二轮：遗留问题修复（2026-08-28）
+
+第一轮审查遗漏的四个问题在复查中确认，随用户确认的遗留清单一并修复：
+
+| 编号 | 问题 | 修复 |
+|------|------|------|
+| R19 | （新发现）图片池始终渲染全部已上传图片，已分组的图片磁贴仍留在「待分组图片」池里，与池子语义不符 | `updateImagePool` 只渲染未分组图片 |
+| R20 | 触摸下同组拖拽会落到组末尾，组内排序不生效 | 触摸/鼠标统一按落点插入（`insertImageIntoGroup`），组内排序触屏可用 |
+| R21 | 拼接循环读取活的 `imageGroups`，处理期间删图/清空会打乱循环 | 循环前快照分组列表；拼接期间禁用「开始拼图」「清空所有」，`updateStitchButton` 拼接中不重新启用 |
+| R22 | HEIC 等浏览器无法解码的格式静默失败（图片进池但缩略图 broken） | `img.onerror` 剔除文件并 revoke，处理完成后统一 alert 提示 |
+| R23 | 无 EXIF 的图片按文件时间与有拍摄时间的混排 | 增加 `exifTime` 标记，排序时无拍摄时间的排在其后 |
+| R24 | 每次操作全量重建图片池/分组 DOM，大量图片时移动端卡顿 | 节点按键复用的增量渲染；「清空分组」改为事件委托 |
+| R25 | gh-pages 会带上 README/package.json/tests 等非站点文件 | deploy.yml 先收集 index.html/style.css/script.js 到 site/ 再发布 |
+| R26 | 无自动化测试、内联 onclick 阻止 CSP、无障碍缺失 | 测试入库（`tests/smoke.test.js`，`npm test`）；移除全部内联 onclick 并加 CSP meta；删除按钮加 aria-label、进度文本 aria-live、label 关联 |
+
+说明：第一轮遗留清单中的「迁移 exifr」评估后不执行——exif-js 已有 SRI 且验证可用，换库引入新 CDN 风险收益低；「EXIF 方向」无需改码，现代浏览器 `drawImage` 已按 EXIF 方向解码。
+
+### 第二轮验证记录
+
+`tests/smoke.test.js`（33 项断言，全部通过，无 console/page 错误）新增覆盖第一轮的验证盲区：
+
+- **真实 EXIF 路径**：手工构造带 APP1/ExifIFD 的 JPEG（DateTimeOriginal=2025:06:01 12:00:00），验证走 `EXIF.getData` 解析成功且按拍摄时间排到最前（文件时间故意设为最旧，可区分两种排序依据）；
+- **HEIC 剔除**：损坏字节文件被跳过并 alert，不进池；
+- **鼠标拖拽事件链**：合成 DataTransfer 事件走真实监听器，覆盖池→组（按落点插入最前）、组→组、同组重排（模型与 DOM 一致）、组→池；
+- **触摸手势**：CDP `Input.dispatchTouchEvent` 注入长按 500ms + 移动 + 抬起，覆盖池→组、同组重排到顶部；快速滑动不触发拖拽、数据不变；
+- **CSP**：http 与 file:// 两种方式打开均无 CSP 违规错误（`file:` 源已放行，README 方法3 可用）；
+- **委托按钮**：清空分组/删除图片经事件委托生效。

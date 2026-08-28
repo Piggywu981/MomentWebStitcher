@@ -48,6 +48,7 @@ function initializeApp() {
     setupFileInput();
     setupQualitySlider();
     setupDragAndDropGroups();
+    setupButtons();
 }
 
 // 拖拽上传设置
@@ -96,6 +97,34 @@ function setupQualitySlider() {
     });
 }
 
+// 按钮绑定 + 全局点击委托（移除内联 onclick，配合 CSP）
+function setupButtons() {
+    document.getElementById('autoGroupBtn').addEventListener('click', autoGroup);
+    document.getElementById('stitchBtn').addEventListener('click', startStitching);
+    document.getElementById('clearAllBtn').addEventListener('click', clearAll);
+    
+    document.addEventListener('click', function(e) {
+        const removeBtn = e.target.closest('.remove-btn');
+        if (removeBtn) {
+            const tile = removeBtn.closest('.pool-image, .group-image');
+            if (!tile) return;
+            if (tile.classList.contains('pool-image')) {
+                removeImage(tile.dataset.imageId);
+            } else {
+                removeImageFromGroups(tile.dataset.imageId);
+                updateGroups();
+                updateImagePool();
+            }
+            return;
+        }
+        
+        const clearBtn = e.target.closest('.clear-group-btn');
+        if (clearBtn) {
+            clearGroup(parseInt(clearBtn.dataset.groupIndex));
+        }
+    });
+}
+
 // 处理图片上传（优化版）
 function handleImageUpload(files) {
     const validFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
@@ -110,6 +139,7 @@ function handleImageUpload(files) {
     
     let processedCount = 0;
     const totalImages = validFiles.length;
+    const failedNames = [];
     
     const processBatch = async (batch) => {
         const loadPromises = batch.map(file => {
@@ -129,36 +159,44 @@ function handleImageUpload(files) {
                         EXIF.getData(img, function() {
                             const dateTimeOriginal = EXIF.getTag(this, 'DateTimeOriginal');
                             const dateTime = EXIF.getTag(this, 'DateTime');
+                            const rawDateTime = dateTimeOriginal || dateTime;
                             
-                            let dateTaken;
-                            if (dateTimeOriginal) {
-                                dateTaken = parseExifDate(dateTimeOriginal);
-                            } else if (dateTime) {
-                                dateTaken = parseExifDate(dateTime);
+                            // 解析成功才视为拍摄时间；否则按文件时间兜底并排到有拍摄时间的图片之后
+                            const dateTaken = rawDateTime ? parseExifDate(rawDateTime) : null;
+                            if (dateTaken && !isNaN(dateTaken)) {
+                                image.dateTime = dateTaken;
+                                image.exifTime = true;
                             } else {
-                                dateTaken = getFileDate(file);
+                                image.dateTime = getFileDate(file);
+                                image.exifTime = false;
                             }
-                            
-                            image.dateTime = dateTaken;
                             resolve(image);
                         });
                     } catch (error) {
                         image.dateTime = getFileDate(file);
+                        image.exifTime = false;
                         resolve(image);
                     }
                 };
+                // 浏览器解不了的格式（如 HEIC）剔除，最后统一提示
                 img.onerror = function() {
-                    image.dateTime = getFileDate(file);
-                    resolve(image);
+                    URL.revokeObjectURL(image.src);
+                    resolve({ failedName: file.name });
                 };
                 img.src = image.src;
             });
         });
         
-        const batchImages = await Promise.all(loadPromises);
-        processedCount += batchImages.length;
+        const results = await Promise.all(loadPromises);
+        processedCount += results.length;
         
-        uploadedImages.push(...batchImages);
+        results.forEach(r => {
+            if (r && r.failedName) {
+                failedNames.push(r.failedName);
+            } else {
+                uploadedImages.push(r);
+            }
+        });
         
         // 使用防抖更新UI
         debouncedUpdateImagePool();
@@ -172,10 +210,19 @@ function handleImageUpload(files) {
     batches.reduce((promise, batch) => {
         return promise.then(() => processBatch(batch));
     }, Promise.resolve()).then(() => {
-        // 全部完成后按拍摄时间统一排序（分批完成顺序 ≠ 时间顺序）
-        uploadedImages.sort((a, b) => a.dateTime - b.dateTime);
+        // 全部完成后统一排序（分批完成顺序 ≠ 时间顺序）：有拍摄时间的在前按时间升序，其余按文件时间排在其后
+        uploadedImages.sort((a, b) => {
+            const aExif = a.exifTime ? 1 : 0;
+            const bExif = b.exifTime ? 1 : 0;
+            if (aExif !== bExif) return bExif - aExif;
+            return a.dateTime - b.dateTime;
+        });
         updateImagePool();
         document.getElementById('progressText').textContent = '准备就绪';
+        
+        if (failedNames.length) {
+            alert('以下 ' + failedNames.length + ' 个文件无法解码，已跳过（可能是浏览器不支持的格式，如 HEIC）：\n' + failedNames.join('\n'));
+        }
     });
 }
 
@@ -196,17 +243,33 @@ function debounce(func, wait) {
     };
 }
 
-// 更新图片池显示（优化版）
+// 更新图片池显示（只显示未分组的图片；节点按键复用，避免全量重建导致缩略图重新解码）
 function updateImagePool() {
     const poolImages = document.getElementById('poolImages');
-    const fragment = document.createDocumentFragment();
-    
-    // 使用文档片段减少重排
-    uploadedImages.forEach(image => {
-        const div = createImageElement(image, 'pool');
-        fragment.appendChild(div);
+    const existing = new Map();
+    poolImages.querySelectorAll('.pool-image').forEach(el => {
+        existing.set(String(el.dataset.imageId), el);
     });
     
+    const groupedIds = new Set();
+    imageGroups.forEach(group => group.forEach(img => groupedIds.add(String(img.id))));
+    
+    const fragment = document.createDocumentFragment();
+    uploadedImages.forEach(image => {
+        if (groupedIds.has(String(image.id))) return;
+        
+        const idStr = String(image.id);
+        let el = existing.get(idStr);
+        if (el) {
+            existing.delete(idStr);
+        } else {
+            el = createImageElement(image, 'pool');
+        }
+        fragment.appendChild(el);
+    });
+    
+    // 清掉已分组/已删除图片的节点
+    existing.forEach(el => el.remove());
     poolImages.innerHTML = '';
     poolImages.appendChild(fragment);
     
@@ -240,7 +303,7 @@ function createImageElement(image, type) {
                 <span>${name}</span>
                 <small>${time}</small>
             </div>
-            <button class="remove-btn" onclick="removeImage('${image.id}')">×</button>
+            <button type="button" class="remove-btn" aria-label="删除图片">×</button>
         `;
     } else {
         div.innerHTML = `
@@ -249,7 +312,7 @@ function createImageElement(image, type) {
                 <span class="filename">${name}</span>
                 <small>${time}</small>
             </div>
-            <button class="remove-btn" onclick="removeFromGroup(this)">×</button>
+            <button type="button" class="remove-btn" aria-label="从分组移除图片">×</button>
         `;
     }
     
@@ -301,8 +364,10 @@ function setupDragAndDropGroups() {
                 // 同组内排序：DOM 顺序已在 dragover 中调整，只需同步数据模型
                 updateGroupOrder(dropTarget);
             } else {
-                const groupIndex = parseInt(dropTarget.dataset.groupIndex);
-                addImageToGroup(image, groupIndex);
+                // 按落点插入目标组（而不是追加到末尾）
+                const afterEl = getDragAfterElement(dropTarget, e.clientX, e.clientY);
+                const beforeId = afterEl ? afterEl.dataset.imageId : null;
+                insertImageIntoGroup(image, parseInt(dropTarget.dataset.groupIndex), beforeId);
                 updateGroups();
                 updateImagePool();
             }
@@ -502,13 +567,14 @@ function enableTouchSupport() {
                 touchItem.style.boxShadow = '';
                 touchItem.classList.remove('dragging');
                 
-                // 处理放置逻辑
+                // 处理放置逻辑（按手指落点插入，组内排序同样生效）
                 if (groupImages) {
                     const imageId = touchItem.dataset.imageId;
                     const image = uploadedImages.find(img => img.id == imageId);
                     if (image) {
-                        const groupIndex = parseInt(groupImages.dataset.groupIndex);
-                        addImageToGroup(image, groupIndex);
+                        const afterEl = getDragAfterElement(groupImages, touch.clientX, touch.clientY);
+                        const beforeId = afterEl ? afterEl.dataset.imageId : null;
+                        insertImageIntoGroup(image, parseInt(groupImages.dataset.groupIndex), beforeId);
                         updateGroups();
                         updateImagePool();
                         
@@ -612,43 +678,52 @@ function autoGroup() {
     updateImagePool();
 }
 
-// 更新分组显示（优化版）
+// 更新分组显示（清理空分组；组内图片节点按键复用，避免全量重建）
 function updateGroups() {
     // 清理空分组，保证 DOM 的 data-group-index 与数据索引一致
     imageGroups = imageGroups.filter(group => group.length > 0);
     
     const container = document.getElementById('groupsContainer');
-    const fragment = document.createDocumentFragment();
+    const existing = new Map();
+    container.querySelectorAll('.group-image').forEach(el => {
+        existing.set(String(el.dataset.imageId), el);
+    });
     
+    const fragment = document.createDocumentFragment();
     imageGroups.forEach((group, index) => {
         const groupDiv = document.createElement('div');
         groupDiv.className = 'group-box';
         groupDiv.innerHTML = `
             <h4>第 ${index + 1} 组 (${group.length} 张图片)</h4>
             <div class="group-images" data-group-index="${index}"></div>
-            <button onclick="clearGroup(${index})">清空分组</button>
+            <button type="button" class="clear-group-btn" data-group-index="${index}">清空分组</button>
         `;
         
         const imagesDiv = groupDiv.querySelector('.group-images');
-        const imagesFragment = document.createDocumentFragment();
-        
         group.forEach(image => {
-            const imgDiv = createImageElement(image, 'group');
-            imagesFragment.appendChild(imgDiv);
+            const idStr = String(image.id);
+            let el = existing.get(idStr);
+            if (el) {
+                existing.delete(idStr);
+            } else {
+                el = createImageElement(image, 'group');
+            }
+            imagesDiv.appendChild(el);
         });
         
-        imagesDiv.appendChild(imagesFragment);
         fragment.appendChild(groupDiv);
     });
     
+    // 清掉不再属于任何分组的节点
+    existing.forEach(el => el.remove());
     container.innerHTML = '';
     container.appendChild(fragment);
     
     updateStitchButton();
 }
 
-// 添加图片到分组
-function addImageToGroup(image, groupIndex) {
+// 把图片插入到指定组内 beforeId 之前（beforeId 为空表示追加到末尾）
+function insertImageIntoGroup(image, groupIndex, beforeId) {
     // 确保groupIndex是有效的数字
     groupIndex = parseInt(groupIndex);
     if (isNaN(groupIndex) || groupIndex < 0) {
@@ -660,13 +735,17 @@ function addImageToGroup(image, groupIndex) {
         imageGroups.push([]);
     }
     
-    // 先按住目标组的引用再移除：若源组被搬空，后续 push 仍落在正确的组上
+    // 先按住目标组的引用再移除：若源组被搬空，后续插入仍落在正确的组上
     const targetGroup = imageGroups[groupIndex];
     
     // 从其他分组或图片池中移除
     removeImageFromGroups(image.id);
     
-    targetGroup.push(image);
+    let index = beforeId == null
+        ? targetGroup.length
+        : targetGroup.findIndex(img => img.id == beforeId);
+    if (index < 0) index = targetGroup.length;
+    targetGroup.splice(index, 0, image);
 }
 
 // 从所有分组中移除图片（不清理空分组，由 updateGroups 统一清理，避免中途索引左移）
@@ -686,14 +765,7 @@ function clearGroup(index) {
     updateImagePool();
 }
 
-// 从分组中移除图片
-function removeFromGroup(button) {
-    const imageDiv = button.parentElement;
-    const imageId = imageDiv.dataset.imageId;
-    removeImageFromGroups(imageId);
-    updateGroups();
-    updateImagePool();
-}
+// 从分组中移除图片的操作已并入 setupButtons 的点击委托
 
 // 移除图片
 function removeImage(imageId) {
@@ -722,6 +794,8 @@ function clearAll() {
 
 // 更新拼接按钮状态
 function updateStitchButton() {
+    // 拼接进行中由 startStitching 的 finally 恢复，避免中途被其他操作重新启用
+    if (isStitching) return;
     const hasGroups = imageGroups.length > 0 && imageGroups.some(group => group.length > 1);
     document.getElementById('stitchBtn').disabled = !hasGroups;
 }
@@ -734,27 +808,31 @@ async function startStitching() {
     const progressFill = document.getElementById('progressFill');
     const progressText = document.getElementById('progressText');
     const stitchBtn = document.getElementById('stitchBtn');
+    const clearAllBtn = document.getElementById('clearAllBtn');
     
     isStitching = true;
     stitchBtn.disabled = true;
+    clearAllBtn.disabled = true;
     progressText.textContent = '开始处理...';
     
     try {
         let skippedGroups = 0;
+        // 快照分组列表，处理期间界面操作不会打乱循环
+        const groups = imageGroups.slice();
         
-        for (let i = 0; i < imageGroups.length; i++) {
-            const group = imageGroups[i];
+        for (let i = 0; i < groups.length; i++) {
+            const group = groups[i];
             if (group.length < 2) {
                 skippedGroups++;
                 continue;
             }
             
-            progressText.textContent = `处理第 ${i + 1} 组，共 ${imageGroups.length} 组...`;
+            progressText.textContent = `处理第 ${i + 1} 组，共 ${groups.length} 组...`;
             
             const stitchedImage = await stitchImages(group, quality);
             await downloadImage(stitchedImage, `stitched_image_${i + 1}.jpg`);
             
-            const progress = ((i + 1) / imageGroups.length) * 100;
+            const progress = ((i + 1) / groups.length) * 100;
             progressFill.style.width = progress + '%';
         }
         
@@ -771,6 +849,7 @@ async function startStitching() {
         console.error('Stitching error:', error);
     } finally {
         isStitching = false;
+        clearAllBtn.disabled = false;
         updateStitchButton();
     }
 }

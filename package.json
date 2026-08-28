@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "python -m http.server 8000",
     "build": "echo 'No build step required for static site'",
-    "deploy": "echo 'Deploy to GitHub Pages via GitHub Actions'"
+    "deploy": "echo 'Deploy to GitHub Pages via GitHub Actions'",
+    "test": "node tests/smoke.test.js"
   },
   "keywords": [
     "image-stitching",

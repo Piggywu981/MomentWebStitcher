@@ -11,10 +11,16 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
+    # 只发布站点文件，避免 README/package.json/tests 等混进 gh-pages
+    - name: Collect site files
+      run: |
+        mkdir site
+        cp index.html style.css script.js site/
+    
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v4
       if: github.ref == 'refs/heads/main'
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./
+        publish_dir: ./site
         publish_branch: gh-pages

@@ -75,3 +75,5 @@ build/
 _site/
 .jekyll-cache/
 .jekyll-metadata
+# 测试截图产物
+tests/smoke-after.png
