@@ -10,6 +10,24 @@ let isStitching = false;
 const MAX_OUTPUT_WIDTH = 1080;
 const MAX_CANVAS_AREA = 16777216;
 
+// 内联 SVG 图标（CSP 合规，无外链）
+const ICONS = {
+    plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+    x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    grip: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg>',
+    sliders: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/></svg>',
+    chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>',
+    expand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 3H3v6M15 3h6v6M3 15v6h6M21 15v6h-6"/></svg>',
+    download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11M7 9l5 5 5-5M4 21h16"/></svg>',
+};
+
+// 把 .i[data-icon] / .icon-btn[data-icon] 占位替换成 SVG
+function setupIcons(root = document) {
+    root.querySelectorAll('.i[data-icon], .icon-btn[data-icon]').forEach(el => {
+        el.innerHTML = ICONS[el.dataset.icon] || '';
+    });
+}
+
 // 解析EXIF日期格式
 function parseExifDate(exifDate) {
     if (!exifDate) return new Date();
@@ -44,12 +62,27 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function initializeApp() {
+    setupIcons();
     setupDragAndDrop();
     setupFileInput();
     setupQualitySlider();
     setupDragAndDropGroups();
     setupButtons();
+    setupBottomBar();
 }
+
+// 底部抽屉（移动端参数面板开合）
+function setupBottomBar() {
+    const paramsPanel = document.getElementById('paramsPanel');
+    const paramsToggle = document.getElementById('paramsToggle');
+    paramsToggle.addEventListener('click', function() {
+        const open = paramsPanel.classList.toggle('open');
+        paramsToggle.setAttribute('aria-expanded', String(open));
+    });
+}
+
+// 全屏预览占位（任务 3 实现真身）
+function openPreview(groupIndex) {}
 
 // 拖拽上传设置
 function setupDragAndDrop() {
@@ -121,6 +154,19 @@ function setupButtons() {
         const clearBtn = e.target.closest('.clear-group-btn');
         if (clearBtn) {
             clearGroup(parseInt(clearBtn.dataset.groupIndex));
+            return;
+        }
+        
+        const collapseBtn = e.target.closest('.collapse-toggle');
+        if (collapseBtn) {
+            collapseBtn.closest('.group-box').classList.toggle('collapsed');
+            return;
+        }
+        
+        const expandBtn = e.target.closest('.expand-preview');
+        if (expandBtn) {
+            openPreview(parseInt(expandBtn.dataset.groupIndex));
+            return;
         }
     });
 }
@@ -299,20 +345,18 @@ function createImageElement(image, type) {
     if (type === 'pool') {
         div.innerHTML = `
             <img src="${image.src}" alt="${name}" loading="lazy">
-            <div class="image-info">
-                <span>${name}</span>
-                <small>${time}</small>
-            </div>
-            <button type="button" class="remove-btn" aria-label="删除图片">×</button>
+            <div class="image-info"><span>${name}</span><small>${time}</small></div>
+            <button type="button" class="remove-btn" aria-label="删除图片">${ICONS.x}</button>
         `;
     } else {
         div.innerHTML = `
+            <span class="grip" aria-hidden="true">${ICONS.grip}</span>
             <img src="${image.src}" alt="${name}" loading="lazy">
-            <div class="image-info">
+            <div class="meta">
                 <span class="filename">${name}</span>
                 <small>${time}</small>
             </div>
-            <button type="button" class="remove-btn" aria-label="从分组移除图片">×</button>
+            <button type="button" class="remove-btn" aria-label="从分组移除图片">${ICONS.x}</button>
         `;
     }
     
@@ -693,10 +737,18 @@ function updateGroups() {
     imageGroups.forEach((group, index) => {
         const groupDiv = document.createElement('div');
         groupDiv.className = 'group-box';
+        groupDiv.dataset.groupIndex = index;
         groupDiv.innerHTML = `
-            <h4>第 ${index + 1} 组 (${group.length} 张图片)</h4>
+            <div class="group-head">
+                <span class="group-title">第 ${index + 1} 组</span>
+                <span class="badge">${group.length} 张</span>
+                <span class="spacer"></span>
+                <canvas class="mini-preview" height="96" aria-hidden="true"></canvas>
+                <button type="button" class="icon-btn expand-preview" data-group-index="${index}" aria-label="放大预览">${ICONS.expand}</button>
+                <button type="button" class="icon-btn collapse-toggle" aria-label="折叠分组">${ICONS.chevron}</button>
+                <button type="button" class="clear-group-btn icon-btn" data-group-index="${index}" aria-label="清空分组">${ICONS.x}</button>
+            </div>
             <div class="group-images" data-group-index="${index}"></div>
-            <button type="button" class="clear-group-btn" data-group-index="${index}">清空分组</button>
         `;
         
         const imagesDiv = groupDiv.querySelector('.group-images');
