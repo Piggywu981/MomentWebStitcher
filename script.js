@@ -2,6 +2,13 @@
 let uploadedImages = [];
 let imageGroups = [];
 let draggedElement = null;
+let dragSourceContainer = null;
+let isStitching = false;
+
+// 输出限制：宽度 1080px 对朋友圈足够（微信会二次压缩），
+// 总面积上限规避移动端 Safari 大 canvas 输出空白的问题
+const MAX_OUTPUT_WIDTH = 1080;
+const MAX_CANVAS_AREA = 16777216;
 
 // 解析EXIF日期格式
 function parseExifDate(exifDate) {
@@ -26,6 +33,11 @@ function parseExifDate(exifDate) {
     return new Date(year, month, day, hour, minute, second);
 }
 
+// 文件修改时间兜底（file.lastModifiedDate 已废弃）
+function getFileDate(file) {
+    return new Date(file.lastModified);
+}
+
 // 初始化
 document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
@@ -41,6 +53,12 @@ function initializeApp() {
 // 拖拽上传设置
 function setupDragAndDrop() {
     const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    
+    // 点击上传区任意位置打开文件选择（内部按钮点击会冒泡到这里，不会重复触发）
+    uploadArea.addEventListener('click', function() {
+        fileInput.click();
+    });
     
     uploadArea.addEventListener('dragover', function(e) {
         e.preventDefault();
@@ -96,56 +114,50 @@ function handleImageUpload(files) {
     const processBatch = async (batch) => {
         const loadPromises = batch.map(file => {
             return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const image = {
-                        id: Date.now() + Math.random(),
-                        name: file.name,
-                        src: e.target.result,
-                        file: file,
-                        dateTime: null
-                    };
-                    
-                    // 使用图片对象池避免重复创建
-                    const img = new Image();
-                    img.onload = function() {
-                        try {
-                            EXIF.getData(img, function() {
-                                const dateTimeOriginal = EXIF.getTag(this, 'DateTimeOriginal');
-                                const dateTime = EXIF.getTag(this, 'DateTime');
-                                
-                                let dateTaken;
-                                if (dateTimeOriginal) {
-                                    dateTaken = parseExifDate(dateTimeOriginal);
-                                } else if (dateTime) {
-                                    dateTaken = parseExifDate(dateTime);
-                                } else {
-                                    dateTaken = file.lastModifiedDate || new Date(file.lastModified);
-                                }
-                                
-                                image.dateTime = dateTaken;
-                                resolve(image);
-                            });
-                        } catch (error) {
-                            image.dateTime = file.lastModifiedDate || new Date(file.lastModified);
-                            resolve(image);
-                        }
-                    };
-                    img.onerror = function() {
-                        image.dateTime = file.lastModifiedDate || new Date(file.lastModified);
-                        resolve(image);
-                    };
-                    img.src = e.target.result;
+                // 直接使用对象 URL，避免 base64 字符串常驻内存
+                const image = {
+                    id: Date.now() + Math.random(),
+                    name: file.name,
+                    src: URL.createObjectURL(file),
+                    file: file,
+                    dateTime: null
                 };
-                reader.readAsDataURL(file);
+                
+                const img = new Image();
+                img.onload = function() {
+                    try {
+                        EXIF.getData(img, function() {
+                            const dateTimeOriginal = EXIF.getTag(this, 'DateTimeOriginal');
+                            const dateTime = EXIF.getTag(this, 'DateTime');
+                            
+                            let dateTaken;
+                            if (dateTimeOriginal) {
+                                dateTaken = parseExifDate(dateTimeOriginal);
+                            } else if (dateTime) {
+                                dateTaken = parseExifDate(dateTime);
+                            } else {
+                                dateTaken = getFileDate(file);
+                            }
+                            
+                            image.dateTime = dateTaken;
+                            resolve(image);
+                        });
+                    } catch (error) {
+                        image.dateTime = getFileDate(file);
+                        resolve(image);
+                    }
+                };
+                img.onerror = function() {
+                    image.dateTime = getFileDate(file);
+                    resolve(image);
+                };
+                img.src = image.src;
             });
         });
         
         const batchImages = await Promise.all(loadPromises);
         processedCount += batchImages.length;
         
-        // 分批更新UI，避免阻塞
-        batchImages.sort((a, b) => a.dateTime - b.dateTime);
         uploadedImages.push(...batchImages);
         
         // 使用防抖更新UI
@@ -160,6 +172,9 @@ function handleImageUpload(files) {
     batches.reduce((promise, batch) => {
         return promise.then(() => processBatch(batch));
     }, Promise.resolve()).then(() => {
+        // 全部完成后按拍摄时间统一排序（分批完成顺序 ≠ 时间顺序）
+        uploadedImages.sort((a, b) => a.dateTime - b.dateTime);
+        updateImagePool();
         document.getElementById('progressText').textContent = '准备就绪';
     });
 }
@@ -181,20 +196,6 @@ function debounce(func, wait) {
     };
 }
 
-// 节流函数
-function throttle(func, limit) {
-    let inThrottle;
-    return function() {
-        const args = arguments;
-        const context = this;
-        if (!inThrottle) {
-            func.apply(context, args);
-            inThrottle = true;
-            setTimeout(() => inThrottle = false, limit);
-        }
-    };
-}
-
 // 更新图片池显示（优化版）
 function updateImagePool() {
     const poolImages = document.getElementById('poolImages');
@@ -212,6 +213,16 @@ function updateImagePool() {
     updateStitchButton();
 }
 
+// HTML 转义，防止文件名注入
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 // 创建图片元素
 function createImageElement(image, type) {
     const div = document.createElement('div');
@@ -219,79 +230,50 @@ function createImageElement(image, type) {
     div.draggable = true;
     div.dataset.imageId = image.id;
     
+    const name = escapeHtml(image.name);
+    const time = image.dateTime ? image.dateTime.toLocaleString() : '未知时间';
+    
     if (type === 'pool') {
         div.innerHTML = `
-            <img src="${image.src}" alt="${image.name}" loading="lazy">
+            <img src="${image.src}" alt="${name}" loading="lazy">
             <div class="image-info">
-                <span>${image.name}</span>
-                <small>${image.dateTime ? image.dateTime.toLocaleString() : '未知时间'}</small>
+                <span>${name}</span>
+                <small>${time}</small>
             </div>
             <button class="remove-btn" onclick="removeImage('${image.id}')">×</button>
         `;
     } else {
         div.innerHTML = `
-            <img src="${image.src}" alt="${image.name}" loading="lazy">
+            <img src="${image.src}" alt="${name}" loading="lazy">
             <div class="image-info">
-                <span class="filename">${image.name}</span>
-                <small>${image.dateTime ? image.dateTime.toLocaleString() : '未知时间'}</small>
+                <span class="filename">${name}</span>
+                <small>${time}</small>
             </div>
             <button class="remove-btn" onclick="removeFromGroup(this)">×</button>
         `;
     }
     
-    // 拖拽事件
-    div.addEventListener('dragstart', handleDragStart);
-    div.addEventListener('dragend', handleDragEnd);
-    
     return div;
 }
 
-// 拖拽事件处理
-function handleDragStart(e) {
-    draggedElement = e.target;
-    e.target.classList.add('dragging');
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/html', e.target.innerHTML);
-    e.dataTransfer.setData('imageId', e.target.dataset.imageId);
-    
-    // 立即设置鼠标样式
-    e.target.style.cursor = 'grabbing';
-}
-
-function handleDragEnd(e) {
-    e.target.classList.remove('dragging');
-    e.target.style.cursor = 'move';
-    
-    // 清除所有拖拽相关类
-    document.querySelectorAll('.drag-over, .drag-active').forEach(el => {
-        el.classList.remove('drag-over', 'drag-active');
-    });
-}
-
-// 设置分组拖拽（事件委托优化版）
+// 设置分组拖拽（事件委托版：文档级 dragstart/dragend/dragover 各一套，容器级处理高亮与放置）
 function setupDragAndDropGroups() {
-    document.addEventListener('dragover', function(e) {
-        e.preventDefault();
-    });
-    
-    // 使用事件委托减少事件监听器数量
     const container = document.getElementById('groupsContainer');
     const poolImages = document.getElementById('poolImages');
     
-    // 事件委托处理所有拖拽事件
+    // 容器级事件委托：放置高亮与 drop 处理
     function handleDragEvents(e) {
         const target = e.target;
         const relatedTarget = e.relatedTarget;
         
         if (e.type === 'dragover') {
-            e.preventDefault();
             if (target.classList.contains('group-images') || target.id === 'poolImages') {
                 target.classList.add('drag-over');
             }
         } else if (e.type === 'dragleave') {
             if (target.classList.contains('group-images') || target.id === 'poolImages') {
                 if (!target.contains(relatedTarget)) {
-                    target.classList.remove('drag-over', 'drag-active');
+                    target.classList.remove('drag-over');
                 }
             }
         } else if (e.type === 'drop') {
@@ -303,7 +285,7 @@ function setupDragAndDropGroups() {
             
             if (!dropTarget) return;
             
-            dropTarget.classList.remove('drag-over', 'drag-active');
+            dropTarget.classList.remove('drag-over');
             
             const imageId = e.dataTransfer.getData('imageId');
             if (!imageId) return;
@@ -315,6 +297,9 @@ function setupDragAndDropGroups() {
                 removeImageFromGroups(imageId);
                 updateImagePool();
                 updateGroups();
+            } else if (dragSourceContainer === dropTarget) {
+                // 同组内排序：DOM 顺序已在 dragover 中调整，只需同步数据模型
+                updateGroupOrder(dropTarget);
             } else {
                 const groupIndex = parseInt(dropTarget.dataset.groupIndex);
                 addImageToGroup(image, groupIndex);
@@ -333,57 +318,55 @@ function setupDragAndDropGroups() {
     poolImages.addEventListener('dragleave', handleDragEvents);
     poolImages.addEventListener('drop', handleDragEvents);
     
-    // 启用组内排序功能
-    enableGroupInternalSorting();
-}
-
-// 事件委托后，这个函数不再需要，移除以减少内存占用
-// 拖拽事件处理现在由setupDragAndDropGroups中的事件委托统一管理
-
-// 启用组内排序功能
-function enableGroupInternalSorting() {
-    // 组内排序的事件委托处理
+    // 文档级：允许放置 + 组内实时排序（只移动 DOM，数据模型在 drop/dragend 时同步）
     document.addEventListener('dragover', function(e) {
-        const target = e.target;
-        const groupImages = target.closest('.group-images');
+        e.preventDefault();
         
+        const groupImages = e.target.closest('.group-images');
         if (groupImages && draggedElement) {
-            e.preventDefault();
-            
-            // 获取拖拽目标
             const afterElement = getDragAfterElement(groupImages, e.clientX, e.clientY);
             const dragging = document.querySelector('.dragging');
+            
+            if (!dragging) return;
             
             if (afterElement == null) {
                 groupImages.appendChild(dragging);
             } else {
                 groupImages.insertBefore(dragging, afterElement);
             }
-            
-            // 更新数据模型
+        }
+    });
+    
+    // 文档级：统一处理图片池与分组内元素的拖拽开始
+    document.addEventListener('dragstart', function(e) {
+        const imgDiv = e.target.closest('.pool-image, .group-image');
+        if (!imgDiv) return;
+        
+        draggedElement = imgDiv;
+        dragSourceContainer = imgDiv.parentElement;
+        imgDiv.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/html', imgDiv.outerHTML);
+        e.dataTransfer.setData('imageId', imgDiv.dataset.imageId);
+        imgDiv.style.cursor = 'grabbing';
+    });
+    
+    // 文档级：统一收尾；未发生 drop（拖拽取消）时把最终 DOM 顺序同步回数据模型
+    document.addEventListener('dragend', function(e) {
+        const imgDiv = e.target.closest('.pool-image, .group-image');
+        if (!imgDiv) return;
+        
+        imgDiv.classList.remove('dragging');
+        imgDiv.style.cursor = '';
+        
+        const groupImages = imgDiv.closest('.group-images');
+        if (groupImages && imgDiv.isConnected) {
             updateGroupOrder(groupImages);
         }
-    });
-    
-    // 为组内图片添加拖拽事件
-    document.addEventListener('dragstart', function(e) {
-        const imgDiv = e.target.closest('.group-image');
-        if (imgDiv && imgDiv.parentElement.classList.contains('group-images')) {
-            draggedElement = imgDiv;
-            imgDiv.classList.add('dragging');
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/html', imgDiv.outerHTML);
-            e.dataTransfer.setData('imageId', imgDiv.dataset.imageId);
-            e.dataTransfer.setData('fromGroup', 'true');
-        }
-    });
-    
-    document.addEventListener('dragend', function(e) {
-        const imgDiv = e.target.closest('.group-image');
-        if (imgDiv) {
-            imgDiv.classList.remove('dragging');
-            draggedElement = null;
-        }
+        
+        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        draggedElement = null;
+        dragSourceContainer = null;
     });
     
     // 触摸手势支持
@@ -393,21 +376,15 @@ function enableGroupInternalSorting() {
 // 触摸手势支持（优化版：防误触 + 触觉反馈）
 function enableTouchSupport() {
     let touchItem = null;
-    let touchStartTime = 0;
     let longPressTimer = null;
     let initialTouch = null;
     let touchThreshold = 10; // 移动阈值，防止误触
     
-    // 添加脉冲动画样式
+    // 拖拽跟手样式
     if (!document.querySelector('#touch-support-styles')) {
         const style = document.createElement('style');
         style.id = 'touch-support-styles';
         style.textContent = `
-            @keyframes pulse {
-                0% { opacity: 0.4; }
-                50% { opacity: 0.8; }
-                100% { opacity: 0.4; }
-            }
             .dragging {
                 transition: none !important;
             }
@@ -415,15 +392,20 @@ function enableTouchSupport() {
         document.head.appendChild(style);
     }
     
-    // 触摸开始
+    // 阻止长按弹出系统菜单（安卓）；iOS 由 CSS -webkit-touch-callout 处理
+    document.addEventListener('contextmenu', function(e) {
+        if (e.target.closest('.pool-image, .group-image')) {
+            e.preventDefault();
+        }
+    });
+    
+    // 触摸开始（不 preventDefault，保留页面滚动；移动超阈值会取消长按）
     document.addEventListener('touchstart', function(e) {
         const touch = e.touches[0];
         const target = e.target.closest('.pool-image, .group-image');
         
         if (target) {
-            e.preventDefault();
             touchItem = target;
-            touchStartTime = Date.now();
             initialTouch = { x: touch.clientX, y: touch.clientY };
             
             // 添加触觉反馈
@@ -503,8 +485,6 @@ function enableTouchSupport() {
         }
         
         if (touchItem) {
-            const touchDuration = Date.now() - touchStartTime;
-            
             if (touchItem.classList.contains('dragging')) {
                 // 处理拖拽结束
                 const touch = e.changedTouches[0];
@@ -545,33 +525,8 @@ function enableTouchSupport() {
                 }
                 
                 document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-            } else if (touchDuration < 500) {
-                // 短按 - 可能是点击删除按钮
-                const rect = touchItem.getBoundingClientRect();
-                const touch = e.changedTouches[0];
-                
-                // 检查是否在删除按钮上（扩大点击区域）
-                const removeBtn = touchItem.querySelector('.remove-btn');
-                if (removeBtn) {
-                    const btnRect = removeBtn.getBoundingClientRect();
-                    const expandedRect = {
-                        left: btnRect.left - 10,
-                        right: btnRect.right + 10,
-                        top: btnRect.top - 10,
-                        bottom: btnRect.bottom + 10
-                    };
-                    
-                    if (touch.clientX >= expandedRect.left && touch.clientX <= expandedRect.right &&
-                        touch.clientY >= expandedRect.top && touch.clientY <= expandedRect.bottom) {
-                        removeBtn.click();
-                        
-                        // 删除操作的触觉反馈
-                        if (navigator.vibrate) {
-                            navigator.vibrate(100);
-                        }
-                    }
-                }
             }
+            // 短按点击（删除按钮等）已交还浏览器原生 click 处理
             
             touchItem = null;
             initialTouch = null;
@@ -639,7 +594,7 @@ function updateGroupOrder(groupImages) {
 // 自动分组
 function autoGroup() {
     const groupSize = parseInt(document.getElementById('groupSize').value);
-    if (groupSize <= 0) {
+    if (isNaN(groupSize) || groupSize <= 0) {
         alert('请输入有效的分组大小');
         return;
     }
@@ -659,6 +614,9 @@ function autoGroup() {
 
 // 更新分组显示（优化版）
 function updateGroups() {
+    // 清理空分组，保证 DOM 的 data-group-index 与数据索引一致
+    imageGroups = imageGroups.filter(group => group.length > 0);
+    
     const container = document.getElementById('groupsContainer');
     const fragment = document.createDocumentFragment();
     
@@ -702,18 +660,16 @@ function addImageToGroup(image, groupIndex) {
         imageGroups.push([]);
     }
     
+    // 先按住目标组的引用再移除：若源组被搬空，后续 push 仍落在正确的组上
+    const targetGroup = imageGroups[groupIndex];
+    
     // 从其他分组或图片池中移除
     removeImageFromGroups(image.id);
     
-    // 确保目标分组存在
-    if (!imageGroups[groupIndex]) {
-        imageGroups[groupIndex] = [];
-    }
-    
-    imageGroups[groupIndex].push(image);
+    targetGroup.push(image);
 }
 
-// 从所有分组中移除图片
+// 从所有分组中移除图片（不清理空分组，由 updateGroups 统一清理，避免中途索引左移）
 function removeImageFromGroups(imageId) {
     imageGroups.forEach(group => {
         const index = group.findIndex(img => img.id == imageId);
@@ -721,9 +677,6 @@ function removeImageFromGroups(imageId) {
             group.splice(index, 1);
         }
     });
-    
-    // 移除空分组
-    imageGroups = imageGroups.filter(group => group.length > 0);
 }
 
 // 清空分组
@@ -744,6 +697,10 @@ function removeFromGroup(button) {
 
 // 移除图片
 function removeImage(imageId) {
+    const target = uploadedImages.find(img => img.id == imageId);
+    if (target && target.src.startsWith('blob:')) {
+        URL.revokeObjectURL(target.src);
+    }
     uploadedImages = uploadedImages.filter(img => img.id != imageId);
     removeImageFromGroups(imageId);
     updateImagePool();
@@ -752,6 +709,9 @@ function removeImage(imageId) {
 
 // 清空所有
 function clearAll() {
+    uploadedImages.forEach(img => {
+        if (img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
+    });
     uploadedImages = [];
     imageGroups = [];
     updateImagePool();
@@ -768,16 +728,26 @@ function updateStitchButton() {
 
 // 开始拼接
 async function startStitching() {
+    if (isStitching) return;
+    
     const quality = parseInt(document.getElementById('qualitySlider').value) / 100;
     const progressFill = document.getElementById('progressFill');
     const progressText = document.getElementById('progressText');
+    const stitchBtn = document.getElementById('stitchBtn');
     
+    isStitching = true;
+    stitchBtn.disabled = true;
     progressText.textContent = '开始处理...';
     
     try {
+        let skippedGroups = 0;
+        
         for (let i = 0; i < imageGroups.length; i++) {
             const group = imageGroups[i];
-            if (group.length < 2) continue;
+            if (group.length < 2) {
+                skippedGroups++;
+                continue;
+            }
             
             progressText.textContent = `处理第 ${i + 1} 组，共 ${imageGroups.length} 组...`;
             
@@ -788,7 +758,9 @@ async function startStitching() {
             progressFill.style.width = progress + '%';
         }
         
-        progressText.textContent = '处理完成！';
+        progressText.textContent = skippedGroups > 0
+            ? `处理完成！（${skippedGroups} 个单图分组已跳过）`
+            : '处理完成！';
         setTimeout(() => {
             progressFill.style.width = '0%';
             progressText.textContent = '准备就绪';
@@ -797,6 +769,9 @@ async function startStitching() {
     } catch (error) {
         progressText.textContent = '处理失败: ' + error.message;
         console.error('Stitching error:', error);
+    } finally {
+        isStitching = false;
+        updateStitchButton();
     }
 }
 
@@ -809,7 +784,6 @@ async function stitchImages(images, quality) {
         // 加载所有图片
         const imageElements = [];
         let minWidth = Infinity;
-        let totalHeight = 0;
         
         let loadedCount = 0;
         
@@ -833,17 +807,23 @@ async function stitchImages(images, quality) {
             // 按原始顺序排序
             imageElements.sort((a, b) => a.index - b.index);
             
-            // 计算缩放后的尺寸
-            const scaledImages = imageElements.map(({ img, originalWidth, originalHeight }) => {
-                const scale = minWidth / originalWidth;
-                const newHeight = Math.round(originalHeight * scale);
-                totalHeight += newHeight;
-                return { img, newHeight };
-            });
+            // 计算指定输出宽度下的总高度
+            const heightAt = (width) => imageElements.reduce((sum, { originalWidth, originalHeight }) =>
+                sum + Math.max(1, Math.round(originalHeight * width / originalWidth)), 0);
+            
+            // 输出宽度：取最小原图宽（保证不放大），并钳制到 1080 以内
+            let outputWidth = Math.min(minWidth, MAX_OUTPUT_WIDTH);
+            
+            // 总面积超限时等比缩小整条长图，规避移动端 canvas 尺寸上限
+            if (outputWidth * heightAt(outputWidth) > MAX_CANVAS_AREA) {
+                outputWidth = Math.max(1, Math.floor(
+                    outputWidth * Math.sqrt(MAX_CANVAS_AREA / (outputWidth * heightAt(outputWidth)))
+                ));
+            }
             
             // 设置canvas尺寸
-            canvas.width = minWidth;
-            canvas.height = totalHeight;
+            canvas.width = outputWidth;
+            canvas.height = heightAt(outputWidth);
             
             // 绘制白色背景
             ctx.fillStyle = 'white';
@@ -851,23 +831,20 @@ async function stitchImages(images, quality) {
             
             // 拼接图片
             let yOffset = 0;
-            scaledImages.forEach(({ img, newHeight }) => {
-                const scale = minWidth / img.width;
-                const scaledWidth = minWidth;
-                const scaledHeight = newHeight;
-                
-                ctx.drawImage(img, 0, yOffset, scaledWidth, scaledHeight);
-                yOffset += newHeight;
+            imageElements.forEach(({ img, originalWidth, originalHeight }) => {
+                const drawHeight = Math.max(1, Math.round(originalHeight * outputWidth / originalWidth));
+                ctx.drawImage(img, 0, yOffset, outputWidth, drawHeight);
+                yOffset += drawHeight;
             });
             
-            // 转换为blob
+            // 转换为blob（quality 取值范围 0-1）
             canvas.toBlob(blob => {
                 if (blob) {
                     resolve(URL.createObjectURL(blob));
                 } else {
                     reject(new Error('Failed to create blob'));
                 }
-            }, 'image/jpeg', quality * 100);
+            }, 'image/jpeg', quality);
         }
     });
 }

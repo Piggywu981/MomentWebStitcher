@@ -399,42 +399,6 @@ header p {
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
 }
 
-.group-image.drag-placeholder {
-    border: 2px dashed #4299e1;
-    background-color: rgba(66, 153, 225, 0.1);
-    min-height: 80px;
-    margin: 4px;
-    border-radius: 8px;
-    transition: all 0.2s ease;
-}
-
-.group-images.sort-active {
-    border-color: #4299e1;
-    box-shadow: 0 0 0 1px rgba(66, 153, 225, 0.3);
-}
-
-.group-image.sort-indicator {
-    position: relative;
-}
-
-.group-image.sort-indicator::before {
-    content: '';
-    position: absolute;
-    left: -2px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 4px;
-    height: 60%;
-    background: #4299e1;
-    border-radius: 2px;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-}
-
-.group-image.sort-indicator:hover::before {
-    opacity: 1;
-}
-
 /* 拖拽动画 */
 .pool-image, .group-image {
     transition: transform 0.15s ease, opacity 0.15s ease;
@@ -464,23 +428,6 @@ header p {
     cursor: -webkit-grabbing;
 }
 
-/* 优化动画性能 */
-.pool-image.drag-enter, .group-image.drag-enter {
-    animation: pulse 0.6s ease-in-out;
-}
-
-@keyframes pulse {
-    0% {
-        transform: scale(1) translateZ(0);
-    }
-    50% {
-        transform: scale(1.05) translateZ(0);
-    }
-    100% {
-        transform: scale(1) translateZ(0);
-    }
-}
-
 /* 放置时的平滑过渡优化 */
 .group-images {
     transition: background-color 0.15s ease, box-shadow 0.15s ease;
@@ -490,13 +437,6 @@ header p {
     -webkit-transform: translateZ(0);
     transform: translateZ(0);
     position: relative;
-}
-
-.group-images.drag-active {
-    background-color: rgba(66, 153, 225, 0.1);
-    border-color: rgba(66, 153, 225, 0.3);
-    box-shadow: inset 0 0 10px rgba(66, 153, 225, 0.1);
-    padding: 10px;
 }
 
 .group-images.drag-over {
@@ -523,10 +463,11 @@ header p {
     -moz-osx-font-smoothing: grayscale;
 }
 
-/* 图片懒加载占位符 */
+/* 图片懒加载占位符；pointer-events:none 让缩略图 img 不劫持拖拽/触摸目标 */
 .pool-image img, .group-image img {
     background: #f0f0f0;
     min-height: 40px;
+    pointer-events: none;
 }
 
 @media (max-width: 768px) {
