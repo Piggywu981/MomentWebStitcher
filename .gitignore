@@ -77,3 +77,6 @@ _site/
 .jekyll-metadata
 # 测试截图产物
 tests/smoke-after.png
+
+# 视觉头脑风暴会话产物
+.superpowers/
