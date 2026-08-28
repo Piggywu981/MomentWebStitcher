@@ -10,6 +10,24 @@ let isStitching = false;
 const MAX_OUTPUT_WIDTH = 1080;
 const MAX_CANVAS_AREA = 16777216;
 
+// 内联 SVG 图标（CSP 合规，无外链）
+const ICONS = {
+    plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+    x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    grip: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg>',
+    sliders: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/></svg>',
+    chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>',
+    expand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 3H3v6M15 3h6v6M3 15v6h6M21 15v6h-6"/></svg>',
+    download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11M7 9l5 5 5-5M4 21h16"/></svg>',
+};
+
+// 把 .i[data-icon] / .icon-btn[data-icon] 占位替换成 SVG
+function setupIcons(root = document) {
+    root.querySelectorAll('.i[data-icon], .icon-btn[data-icon]').forEach(el => {
+        el.innerHTML = ICONS[el.dataset.icon] || '';
+    });
+}
+
 // 解析EXIF日期格式
 function parseExifDate(exifDate) {
     if (!exifDate) return new Date();
@@ -44,11 +62,93 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function initializeApp() {
+    setupIcons();
     setupDragAndDrop();
     setupFileInput();
     setupQualitySlider();
     setupDragAndDropGroups();
     setupButtons();
+    setupBottomBar();
+    setupPreviewOverlay();
+    setupResultCard();
+}
+
+// 底部抽屉（移动端参数面板开合）
+function setupBottomBar() {
+    const paramsPanel = document.getElementById('paramsPanel');
+    const paramsToggle = document.getElementById('paramsToggle');
+    paramsToggle.addEventListener('click', function() {
+        const open = paramsPanel.classList.toggle('open');
+        paramsToggle.setAttribute('aria-expanded', String(open));
+    });
+}
+
+// ===== 全屏预览浮层 =====
+const PREVIEW_RENDER_WIDTH = 480;
+let previewCurrent = 0;
+
+async function openPreview(groupIndex) {
+    if (!imageGroups.length) return;
+    previewCurrent = Math.min(Math.max(groupIndex, 0), imageGroups.length - 1);
+    document.getElementById('previewOverlay').hidden = false;
+    await renderFullPreview();
+}
+
+async function renderFullPreview() {
+    const canvas = document.getElementById('previewCanvas');
+    const group = imageGroups[previewCurrent] || [];
+    document.getElementById('previewTitle').textContent = `第 ${previewCurrent + 1} 组 · ${group.length} 张`;
+    document.getElementById('previewDims').textContent = '';
+    const gen = (previewGen.get('full') || 0) + 1;
+    previewGen.set('full', gen);
+    try {
+        const imgs = await Promise.all(group.map(getDecodedImage));
+        if (previewGen.get('full') !== gen) return;
+        if (imgs.length < 2) {
+            canvas.width = canvas.height = 0;
+            document.getElementById('previewDims').textContent = '再选 1 张即可拼接';
+            return;
+        }
+        let minWidth = Infinity;
+        imgs.forEach(img => { minWidth = Math.min(minWidth, img.naturalWidth); });
+        const outputWidth = Math.min(minWidth, MAX_OUTPUT_WIDTH);
+        const { rows, totalHeight } = computeStitchLayout(
+            imgs.map(img => ({ img, originalWidth: img.naturalWidth, originalHeight: img.naturalHeight })),
+            outputWidth);
+        const scale = PREVIEW_RENDER_WIDTH / outputWidth;
+        canvas.width = PREVIEW_RENDER_WIDTH;
+        canvas.height = Math.round(totalHeight * scale);
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        let y = 0;
+        rows.forEach(({ img, drawHeight }) => {
+            ctx.drawImage(img, 0, y, PREVIEW_RENDER_WIDTH, drawHeight * scale);
+            y += drawHeight * scale;
+        });
+        document.getElementById('previewDims').textContent = `输出 ${outputWidth} × ${totalHeight} px`;
+        canvas.dataset.renders = String((parseInt(canvas.dataset.renders) || 0) + 1);
+    } catch (e) { /* 同迷你预览，静默跳过 */ }
+}
+
+function setupPreviewOverlay() {
+    document.getElementById('previewClose').addEventListener('click', () => {
+        document.getElementById('previewOverlay').hidden = true;
+    });
+    document.getElementById('previewOverlay').addEventListener('click', function(e) {
+        if (e.target === this) this.hidden = true; // 点背景关闭
+    });
+    document.getElementById('previewPrev').addEventListener('click', () => {
+        if (previewCurrent > 0) { previewCurrent--; renderFullPreview(); }
+    });
+    document.getElementById('previewNext').addEventListener('click', () => {
+        if (previewCurrent < imageGroups.length - 1) { previewCurrent++; renderFullPreview(); }
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !document.getElementById('previewOverlay').hidden) {
+            document.getElementById('previewOverlay').hidden = true;
+        }
+    });
 }
 
 // 拖拽上传设置
@@ -121,6 +221,19 @@ function setupButtons() {
         const clearBtn = e.target.closest('.clear-group-btn');
         if (clearBtn) {
             clearGroup(parseInt(clearBtn.dataset.groupIndex));
+            return;
+        }
+        
+        const collapseBtn = e.target.closest('.collapse-toggle');
+        if (collapseBtn) {
+            collapseBtn.closest('.group-box').classList.toggle('collapsed');
+            return;
+        }
+        
+        const expandBtn = e.target.closest('.expand-preview');
+        if (expandBtn) {
+            openPreview(parseInt(expandBtn.dataset.groupIndex));
+            return;
         }
     });
 }
@@ -299,20 +412,18 @@ function createImageElement(image, type) {
     if (type === 'pool') {
         div.innerHTML = `
             <img src="${image.src}" alt="${name}" loading="lazy">
-            <div class="image-info">
-                <span>${name}</span>
-                <small>${time}</small>
-            </div>
-            <button type="button" class="remove-btn" aria-label="删除图片">×</button>
+            <div class="image-info"><span>${name}</span><small>${time}</small></div>
+            <button type="button" class="remove-btn" aria-label="删除图片">${ICONS.x}</button>
         `;
     } else {
         div.innerHTML = `
+            <span class="grip" aria-hidden="true">${ICONS.grip}</span>
             <img src="${image.src}" alt="${name}" loading="lazy">
-            <div class="image-info">
+            <div class="meta">
                 <span class="filename">${name}</span>
                 <small>${time}</small>
             </div>
-            <button type="button" class="remove-btn" aria-label="从分组移除图片">×</button>
+            <button type="button" class="remove-btn" aria-label="从分组移除图片">${ICONS.x}</button>
         `;
     }
     
@@ -693,10 +804,18 @@ function updateGroups() {
     imageGroups.forEach((group, index) => {
         const groupDiv = document.createElement('div');
         groupDiv.className = 'group-box';
+        groupDiv.dataset.groupIndex = index;
         groupDiv.innerHTML = `
-            <h4>第 ${index + 1} 组 (${group.length} 张图片)</h4>
+            <div class="group-head">
+                <span class="group-title">第 ${index + 1} 组</span>
+                <span class="badge">${group.length} 张</span>
+                <span class="spacer"></span>
+                <canvas class="mini-preview" height="96" aria-hidden="true"></canvas>
+                <button type="button" class="icon-btn expand-preview" data-group-index="${index}" aria-label="放大预览">${ICONS.expand}</button>
+                <button type="button" class="icon-btn collapse-toggle" aria-label="折叠分组">${ICONS.chevron}</button>
+                <button type="button" class="clear-group-btn icon-btn" data-group-index="${index}" aria-label="清空分组">${ICONS.x}</button>
+            </div>
             <div class="group-images" data-group-index="${index}"></div>
-            <button type="button" class="clear-group-btn" data-group-index="${index}">清空分组</button>
         `;
         
         const imagesDiv = groupDiv.querySelector('.group-images');
@@ -720,6 +839,7 @@ function updateGroups() {
     container.appendChild(fragment);
     
     updateStitchButton();
+    imageGroups.forEach((_, index) => scheduleMiniPreview(index));
 }
 
 // 把图片插入到指定组内 beforeId 之前（beforeId 为空表示追加到末尾）
@@ -800,6 +920,70 @@ function updateStitchButton() {
     document.getElementById('stitchBtn').disabled = !hasGroups;
 }
 
+// ===== 迷你实时预览 =====
+const MINI_WIDTH = 40;
+const previewDecodeCache = new Map();   // image.id -> HTMLImageElement
+const previewGen = new Map();           // groupIndex -> 渲染代数（丢旧保新）
+const previewTimers = new Map();        // groupIndex -> 防抖 timer
+const previewRenderCount = new Map();   // groupIndex -> 累计渲染次数（DOM 重建也不丢）
+
+function getDecodedImage(imageData) {
+    const key = String(imageData.id);
+    if (previewDecodeCache.has(key)) return Promise.resolve(previewDecodeCache.get(key));
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => { previewDecodeCache.set(key, img); resolve(img); };
+        img.onerror = reject;
+        img.src = imageData.src;
+    });
+}
+
+function scheduleMiniPreview(groupIndex) {
+    clearTimeout(previewTimers.get(groupIndex));
+    previewTimers.set(groupIndex, setTimeout(() => renderMiniPreview(groupIndex), 250));
+}
+
+async function renderMiniPreview(groupIndex) {
+    const box = document.querySelector(`.group-box[data-group-index="${groupIndex}"]`);
+    const canvas = box && box.querySelector('.mini-preview');
+    if (!canvas) return;
+    const group = imageGroups[groupIndex] || [];
+    const gen = (previewGen.get(groupIndex) || 0) + 1;
+    previewGen.set(groupIndex, gen);
+    try {
+        const imgs = await Promise.all(group.map(getDecodedImage));
+        if (previewGen.get(groupIndex) !== gen) return; // 期间又变了，丢旧保新
+        const renderNo = (previewRenderCount.get(groupIndex) || 0) + 1;
+        previewRenderCount.set(groupIndex, renderNo);
+        canvas.dataset.renders = String(renderNo);
+        if (imgs.length < 2) return; // 单图/空组不渲染，张数由 badge 表达
+        let minWidth = Infinity;
+        imgs.forEach(img => { minWidth = Math.min(minWidth, img.naturalWidth); });
+        const outputWidth = Math.min(minWidth, MAX_OUTPUT_WIDTH);
+        const { rows, totalHeight } = computeStitchLayout(
+            imgs.map(img => ({ img, originalWidth: img.naturalWidth, originalHeight: img.naturalHeight })),
+            outputWidth);
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const w = MINI_WIDTH * dpr;
+        const hMax = 120 * dpr;
+        const scale = w / outputWidth;
+        canvas.width = w;
+        canvas.height = Math.min(Math.round(totalHeight * scale), hMax);
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        let y = 0;
+        rows.forEach(({ img, drawHeight }) => {
+            if (y >= canvas.height) return;
+            const h = drawHeight * scale;
+            const clipped = Math.min(h, canvas.height - y);
+            ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight * (clipped / h), 0, y, w, clipped);
+            y += clipped;
+        });
+        canvas.title = `输出 ${outputWidth} × ${totalHeight} px`;
+    } catch (e) { /* 解码失败：磁贴本身可见为 broken，预览静默跳过 */ }
+}
+
 // 开始拼接
 async function startStitching() {
     if (isStitching) return;
@@ -819,6 +1003,7 @@ async function startStitching() {
         let skippedGroups = 0;
         // 快照分组列表，处理期间界面操作不会打乱循环
         const groups = imageGroups.slice();
+        const results = [];
         
         for (let i = 0; i < groups.length; i++) {
             const group = groups[i];
@@ -829,8 +1014,10 @@ async function startStitching() {
             
             progressText.textContent = `处理第 ${i + 1} 组，共 ${groups.length} 组...`;
             
-            const stitchedImage = await stitchImages(group, quality);
-            await downloadImage(stitchedImage, `stitched_image_${i + 1}.jpg`);
+            results.push({
+                url: await stitchImages(group, quality),
+                name: `stitched_image_${i + 1}.jpg`,
+            });
             
             const progress = ((i + 1) / groups.length) * 100;
             progressFill.style.width = progress + '%';
@@ -839,6 +1026,7 @@ async function startStitching() {
         progressText.textContent = skippedGroups > 0
             ? `处理完成！（${skippedGroups} 个单图分组已跳过）`
             : '处理完成！';
+        if (results.length) openResultCard(results);
         setTimeout(() => {
             progressFill.style.width = '0%';
             progressText.textContent = '准备就绪';
@@ -852,6 +1040,15 @@ async function startStitching() {
         clearAllBtn.disabled = false;
         updateStitchButton();
     }
+}
+
+// 布局计算：预览与导出共用，保证所见即所得
+function computeStitchLayout(imgList, outputWidth) {
+    const rows = imgList.map(({ img, originalWidth, originalHeight }) => ({
+        img,
+        drawHeight: Math.max(1, Math.round(originalHeight * outputWidth / originalWidth)),
+    }));
+    return { rows, totalHeight: rows.reduce((s, r) => s + r.drawHeight, 0) };
 }
 
 // 拼接图片
@@ -886,23 +1083,23 @@ async function stitchImages(images, quality) {
             // 按原始顺序排序
             imageElements.sort((a, b) => a.index - b.index);
             
-            // 计算指定输出宽度下的总高度
-            const heightAt = (width) => imageElements.reduce((sum, { originalWidth, originalHeight }) =>
-                sum + Math.max(1, Math.round(originalHeight * width / originalWidth)), 0);
-            
             // 输出宽度：取最小原图宽（保证不放大），并钳制到 1080 以内
             let outputWidth = Math.min(minWidth, MAX_OUTPUT_WIDTH);
             
             // 总面积超限时等比缩小整条长图，规避移动端 canvas 尺寸上限
+            const heightAt = (width) => imageElements.reduce((sum, { originalWidth, originalHeight }) =>
+                sum + Math.max(1, Math.round(originalHeight * width / originalWidth)), 0);
             if (outputWidth * heightAt(outputWidth) > MAX_CANVAS_AREA) {
                 outputWidth = Math.max(1, Math.floor(
                     outputWidth * Math.sqrt(MAX_CANVAS_AREA / (outputWidth * heightAt(outputWidth)))
                 ));
             }
             
+            const { rows, totalHeight } = computeStitchLayout(imageElements, outputWidth);
+            
             // 设置canvas尺寸
             canvas.width = outputWidth;
-            canvas.height = heightAt(outputWidth);
+            canvas.height = totalHeight;
             
             // 绘制白色背景
             ctx.fillStyle = 'white';
@@ -910,8 +1107,7 @@ async function stitchImages(images, quality) {
             
             // 拼接图片
             let yOffset = 0;
-            imageElements.forEach(({ img, originalWidth, originalHeight }) => {
-                const drawHeight = Math.max(1, Math.round(originalHeight * outputWidth / originalWidth));
+            rows.forEach(({ img, drawHeight }) => {
                 ctx.drawImage(img, 0, yOffset, outputWidth, drawHeight);
                 yOffset += drawHeight;
             });
@@ -925,6 +1121,42 @@ async function stitchImages(images, quality) {
                 }
             }, 'image/jpeg', quality);
         }
+    });
+}
+
+// ===== 结果卡片 =====
+function openResultCard(results) {
+    const list = document.getElementById('resultList');
+    list.innerHTML = '';
+    results.forEach(({ url, name }) => {
+        const item = document.createElement('div');
+        item.className = 'result-item';
+        item.innerHTML = `
+            <canvas width="60" height="84"></canvas>
+            <span class="ri-meta">${escapeHtml(name)}</span>
+            <button type="button" class="icon-btn ri-save" aria-label="保存到本地">${ICONS.download}</button>
+        `;
+        const canvas = item.querySelector('canvas');
+        const img = new Image();
+        img.onload = () => {
+            // 缩略按长图比例适配，高度封顶
+            const h = Math.min(Math.round(60 * img.naturalHeight / img.naturalWidth), 168);
+            canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, 60, h);
+        };
+        img.src = url;
+        item.querySelector('.ri-save').addEventListener('click', () => downloadImage(url, name));
+        list.appendChild(item);
+    });
+    document.getElementById('resultOverlay').hidden = false;
+}
+
+function setupResultCard() {
+    document.getElementById('resultCloseBtn').addEventListener('click', () => {
+        document.getElementById('resultOverlay').hidden = true;
+    });
+    document.getElementById('saveAllBtn').addEventListener('click', function() {
+        this.closest('.result-card').querySelectorAll('.ri-save').forEach(b => b.click());
     });
 }
 

@@ -11,64 +11,71 @@
             crossorigin="anonymous" defer></script>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🎯 MomentStitcher</h1>
-            <p>专为朋友圈设计的智能长图拼接工具</p>
+    <div class="app">
+        <header class="app-header">
+            <h1>拼图 <span class="brand-mark">✿</span></h1>
+            <p class="tagline">把生活拼成一张长图</p>
         </header>
 
-        <div class="main-content">
-            <!-- 左侧：图片上传和分组 -->
-            <div class="left-panel">
-                <div class="upload-section">
-                    <div class="upload-area" id="uploadArea">
-                        <div class="upload-icon">📁</div>
-                        <p>拖拽图片到此处或点击选择</p>
-                        <input type="file" id="fileInput" multiple accept="image/*" style="display: none;">
-                        <button type="button">选择图片</button>
-                    </div>
+        <main class="workspace">
+            <section class="panel panel-pool" aria-label="图片池">
+                <div class="upload-card" id="uploadArea">
+                    <span class="i" data-icon="plus"></span>
+                    <p class="upload-hint">拖入照片，或点击添加</p>
+                    <input type="file" id="fileInput" multiple accept="image/*" hidden>
+                    <button type="button" class="btn btn-soft">选择图片</button>
                 </div>
+                <div class="pool-tiles" id="poolImages"></div>
+            </section>
 
-                <div class="group-control">
-                    <h3>分组设置</h3>
-                    <div class="control-row">
-                        <label for="groupSize">每组图片数量：</label>
+            <section class="panel panel-work" aria-label="分组与导出">
+                <div class="params-row" id="paramsPanel">
+                    <label class="field" for="groupSize">每组
                         <input type="number" id="groupSize" value="9" min="1" max="100">
-                        <button id="autoGroupBtn" type="button">自动分组</button>
-                    </div>
-                </div>
-
-                <div class="groups-container" id="groupsContainer">
-                    <!-- 动态生成分组 -->
-                </div>
-            </div>
-
-            <!-- 右侧：输出设置 -->
-            <div class="right-panel">
-                <div class="output-section">
-                    <h3>输出设置</h3>
-                    <div class="control-row">
-                        <label>输出质量：</label>
+                    </label>
+                    <button id="autoGroupBtn" type="button" class="btn btn-soft">自动分组</button>
+                    <label class="field field-quality" for="qualitySlider">质量
                         <input type="range" id="qualitySlider" min="70" max="100" value="95">
                         <span id="qualityValue">95%</span>
-                    </div>
-                    <button id="stitchBtn" type="button" disabled>开始拼图</button>
-                    <button id="clearAllBtn" type="button">清空所有</button>
+                    </label>
                 </div>
+                <div class="groups" id="groupsContainer"></div>
+            </section>
+        </main>
 
-                <div class="progress-section">
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="progressFill"></div>
-                    </div>
-                    <p id="progressText" aria-live="polite">准备就绪</p>
-                </div>
+        <nav class="bottom-bar" aria-label="操作栏">
+            <button id="paramsToggle" type="button" class="icon-btn" data-icon="sliders" aria-label="参数" aria-expanded="false"></button>
+            <div class="progress-wrap">
+                <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+                <p id="progressText" aria-live="polite">准备就绪</p>
             </div>
-        </div>
+            <button id="clearAllBtn" type="button" class="btn btn-ghost">清空所有</button>
+            <button id="stitchBtn" type="button" class="btn btn-primary" disabled>开始拼图</button>
+        </nav>
+    </div>
 
-        <!-- 图片池 -->
-        <div class="image-pool" id="imagePool">
-            <h3>待分组图片</h3>
-            <div class="pool-images" id="poolImages"></div>
+    <!-- 全屏预览浮层 -->
+    <div class="preview-overlay" id="previewOverlay" hidden>
+        <div class="preview-shell" role="dialog" aria-label="长图预览">
+            <header class="preview-head">
+                <button type="button" class="icon-btn flip" id="previewPrev" data-icon="chevron" aria-label="上一组"></button>
+                <span class="preview-meta"><span id="previewTitle">第 1 组</span><span class="preview-dims" id="previewDims"></span></span>
+                <button type="button" class="icon-btn" id="previewNext" data-icon="chevron" aria-label="下一组"></button>
+                <button type="button" class="icon-btn" id="previewClose" data-icon="x" aria-label="关闭"></button>
+            </header>
+            <div class="preview-scroll"><canvas id="previewCanvas"></canvas></div>
+        </div>
+    </div>
+
+    <!-- 结果卡片 -->
+    <div class="result-overlay" id="resultOverlay" hidden>
+        <div class="result-card" role="dialog" aria-label="拼接结果">
+            <h3>拼好啦 <span class="brand-mark">✿</span></h3>
+            <div class="result-list" id="resultList"></div>
+            <div class="result-actions">
+                <button type="button" class="btn btn-ghost" id="resultCloseBtn">完成</button>
+                <button type="button" class="btn btn-primary" id="saveAllBtn">全部保存</button>
+            </div>
         </div>
     </div>
 
