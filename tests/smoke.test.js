@@ -266,6 +266,8 @@ function startServer() {
     await p1;
     check('T7 re-entry guarded', await page.evaluate(() => window.__calls === 1), `calls=${await page.evaluate(() => window.__calls)}`);
     check('T7 clearAllBtn restored', await page.evaluate(() => document.getElementById('clearAllBtn').disabled === false));
+    // 任务4后拼接会弹结果卡片，关掉避免挡住后续点击
+    await page.evaluate(() => { document.getElementById('resultOverlay').hidden = true; });
 
     // T8 触摸（CDP 注入触摸事件）：长按拖拽、组内重排、滚动不被劫持
     // 触摸坐标按视口命中，加高视口让图片池与分组同屏可见
@@ -418,6 +420,43 @@ function startServer() {
     await page.waitForTimeout(200);
     check('T12 overlay closes', await page.evaluate(() =>
         document.getElementById('previewOverlay').hidden));
+
+    // T13 结果卡片
+    await page.evaluate(() => clearAll());
+    await page.evaluate(async () => {
+        const mk = async (name, lm) => {
+            const c = document.createElement('canvas'); c.width = 60; c.height = 80;
+            const g = c.getContext('2d'); g.fillStyle = '#448866'; g.fillRect(0, 0, 60, 80);
+            const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+            handleImageUpload([new File([blob], name, { type: 'image/png', lastModified: lm })]);
+        };
+        await mk('r1.png', 1700000000000);
+        await mk('r2.png', 1700000100000);
+        await mk('r3.png', 1700000200000);
+        await mk('r4.png', 1700000300000);
+    });
+    await page.waitForFunction(() => uploadedImages.length === 4, null, { timeout: 8000 });
+    await page.waitForTimeout(400);
+    await page.evaluate(() => {
+        window.__dlCalls = [];
+        window.downloadImage = async (url, name) => { window.__dlCalls.push(name); };
+    });
+    await page.fill('#groupSize', '2');
+    await page.click('#autoGroupBtn');
+    await page.evaluate(() => startStitching());
+    await page.waitForFunction(() => !document.getElementById('resultOverlay').hidden, null, { timeout: 8000 });
+    check('T13 result card shows 2 items', await page.evaluate(() =>
+        document.querySelectorAll('#resultList .result-item').length === 2));
+    await page.evaluate(() => document.querySelector('#resultList .result-item .ri-save').click());
+    check('T13 save triggers download', await page.evaluate(() =>
+        window.__dlCalls.length === 1 && window.__dlCalls[0] === 'stitched_image_1.jpg'));
+    await page.evaluate(() => document.getElementById('saveAllBtn').click());
+    check('T13 save-all triggers both', await page.evaluate(() =>
+        window.__dlCalls.length === 3));
+    await page.evaluate(() => document.getElementById('resultCloseBtn').click());
+    check('T13 card closes + btns restored', await page.evaluate(() =>
+        document.getElementById('resultOverlay').hidden &&
+        document.getElementById('stitchBtn').disabled === false));
 
     // T9 清空所有
     await page.evaluate(() => clearAll());

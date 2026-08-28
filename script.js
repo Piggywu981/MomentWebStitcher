@@ -70,6 +70,7 @@ function initializeApp() {
     setupButtons();
     setupBottomBar();
     setupPreviewOverlay();
+    setupResultCard();
 }
 
 // 底部抽屉（移动端参数面板开合）
@@ -1002,6 +1003,7 @@ async function startStitching() {
         let skippedGroups = 0;
         // 快照分组列表，处理期间界面操作不会打乱循环
         const groups = imageGroups.slice();
+        const results = [];
         
         for (let i = 0; i < groups.length; i++) {
             const group = groups[i];
@@ -1012,8 +1014,10 @@ async function startStitching() {
             
             progressText.textContent = `处理第 ${i + 1} 组，共 ${groups.length} 组...`;
             
-            const stitchedImage = await stitchImages(group, quality);
-            await downloadImage(stitchedImage, `stitched_image_${i + 1}.jpg`);
+            results.push({
+                url: await stitchImages(group, quality),
+                name: `stitched_image_${i + 1}.jpg`,
+            });
             
             const progress = ((i + 1) / groups.length) * 100;
             progressFill.style.width = progress + '%';
@@ -1022,6 +1026,7 @@ async function startStitching() {
         progressText.textContent = skippedGroups > 0
             ? `处理完成！（${skippedGroups} 个单图分组已跳过）`
             : '处理完成！';
+        if (results.length) openResultCard(results);
         setTimeout(() => {
             progressFill.style.width = '0%';
             progressText.textContent = '准备就绪';
@@ -1116,6 +1121,42 @@ async function stitchImages(images, quality) {
                 }
             }, 'image/jpeg', quality);
         }
+    });
+}
+
+// ===== 结果卡片 =====
+function openResultCard(results) {
+    const list = document.getElementById('resultList');
+    list.innerHTML = '';
+    results.forEach(({ url, name }) => {
+        const item = document.createElement('div');
+        item.className = 'result-item';
+        item.innerHTML = `
+            <canvas width="60" height="84"></canvas>
+            <span class="ri-meta">${escapeHtml(name)}</span>
+            <button type="button" class="icon-btn ri-save" aria-label="保存到本地">${ICONS.download}</button>
+        `;
+        const canvas = item.querySelector('canvas');
+        const img = new Image();
+        img.onload = () => {
+            // 缩略按长图比例适配，高度封顶
+            const h = Math.min(Math.round(60 * img.naturalHeight / img.naturalWidth), 168);
+            canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, 60, h);
+        };
+        img.src = url;
+        item.querySelector('.ri-save').addEventListener('click', () => downloadImage(url, name));
+        list.appendChild(item);
+    });
+    document.getElementById('resultOverlay').hidden = false;
+}
+
+function setupResultCard() {
+    document.getElementById('resultCloseBtn').addEventListener('click', () => {
+        document.getElementById('resultOverlay').hidden = true;
+    });
+    document.getElementById('saveAllBtn').addEventListener('click', function() {
+        this.closest('.result-card').querySelectorAll('.ri-save').forEach(b => b.click());
     });
 }
 
