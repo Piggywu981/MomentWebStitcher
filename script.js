@@ -552,9 +552,22 @@ function setupDragAndDropGroups() {
 // 触摸手势支持（优化版：防误触 + 触觉反馈）
 function enableTouchSupport() {
     let touchItem = null;
+    let touchSourceContainer = null;
     let longPressTimer = null;
     let initialTouch = null;
     let touchThreshold = 10; // 移动阈值，防止误触
+
+    function holdTouchSourceSpace() {
+        touchSourceContainer = touchItem?.parentElement || null;
+        if (touchSourceContainer) {
+            touchSourceContainer.style.minHeight = touchSourceContainer.getBoundingClientRect().height + 'px';
+        }
+    }
+
+    function releaseTouchSourceSpace() {
+        if (touchSourceContainer) touchSourceContainer.style.minHeight = '';
+        touchSourceContainer = null;
+    }
     
     // 拖拽跟手样式
     if (!document.querySelector('#touch-support-styles')) {
@@ -592,6 +605,7 @@ function enableTouchSupport() {
             // 长按触发拖拽（减少等待时间）
             longPressTimer = setTimeout(() => {
                 if (touchItem) {
+                    holdTouchSourceSpace();
                     touchItem.classList.add('dragging');
                     
                     // 创建拖拽效果
@@ -704,7 +718,8 @@ function enableTouchSupport() {
                 document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
             }
             // 短按点击（删除按钮等）已交还浏览器原生 click 处理
-            
+
+            releaseTouchSourceSpace();
             touchItem = null;
             initialTouch = null;
         }
@@ -728,7 +743,8 @@ function enableTouchSupport() {
             touchItem.style.boxShadow = '';
             touchItem = null;
         }
-        
+
+        releaseTouchSourceSpace();
         document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
     }, { passive: false });
 }

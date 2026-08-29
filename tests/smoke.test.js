@@ -24,7 +24,12 @@ function startServer() {
         const server = http.createServer((req, res) => {
             let p = req.url.split('?')[0];
             if (p === '/') p = '/index.html';
-            const file = path.join(ROOT, p);
+            const file = path.resolve(ROOT, `.${p}`);
+            if (!(file === ROOT || file.startsWith(`${ROOT}${path.sep}`))) {
+                res.statusCode = 403;
+                res.end();
+                return;
+            }
             fs.readFile(file, (err, data) => {
                 if (err) { res.statusCode = 404; res.end(); return; }
                 res.setHeader('Content-Type', MIME[path.extname(file)] || 'application/octet-stream');
