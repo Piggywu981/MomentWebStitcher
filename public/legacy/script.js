@@ -1,4 +1,4 @@
-// 全局变量
+﻿// 全局变量
 let uploadedImages = [];
 let imageGroups = [];
 let draggedElement = null;

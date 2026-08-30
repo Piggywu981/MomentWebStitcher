@@ -1,84 +1,15 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' file: https://cdnjs.cloudflare.com; style-src 'self' file: 'unsafe-inline'; img-src 'self' file: blob: data:; connect-src 'self' file: blob:; base-uri 'none'; form-action 'none'">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="./vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="MomentStitcher - 专为朋友圈设计的智能长图拼接工具" />
+    <meta name="theme-color" content="#6366f1" />
     <title>MomentStitcher - 朋友圈长图拼接工具</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.min.js"
-            integrity="sha384-lY3kvVQ+V0PVBIZXIDRHqS5puww73PS/mczZnLbmzkb4ji2AvKdckl8lSzhur8aj"
-            crossorigin="anonymous" defer></script>
-</head>
-<body>
-    <div class="app">
-        <header class="app-header">
-            <h1>拼图 <span class="brand-mark">✿</span></h1>
-            <p class="tagline">把生活拼成一张长图</p>
-        </header>
-
-        <main class="workspace">
-            <section class="panel panel-pool" aria-label="图片池">
-                <div class="upload-card" id="uploadArea">
-                    <span class="i" data-icon="plus"></span>
-                    <p class="upload-hint">拖入照片，或点击添加</p>
-                    <input type="file" id="fileInput" multiple accept="image/*" hidden>
-                    <button type="button" class="btn btn-soft">选择图片</button>
-                </div>
-                <div class="pool-tiles" id="poolImages"></div>
-            </section>
-
-            <section class="panel panel-work" aria-label="分组与导出">
-                <div class="params-row" id="paramsPanel">
-                    <label class="field" for="groupSize">每组
-                        <input type="number" id="groupSize" value="9" min="1" max="100">
-                    </label>
-                    <button id="autoGroupBtn" type="button" class="btn btn-soft">自动分组</button>
-                    <label class="field field-quality" for="qualitySlider">质量
-                        <input type="range" id="qualitySlider" min="70" max="100" value="95">
-                        <span id="qualityValue">95%</span>
-                    </label>
-                </div>
-                <div class="groups" id="groupsContainer"></div>
-            </section>
-        </main>
-
-        <nav class="bottom-bar" aria-label="操作栏">
-            <button id="paramsToggle" type="button" class="icon-btn" data-icon="sliders" aria-label="参数" aria-expanded="false"></button>
-            <div class="progress-wrap">
-                <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
-                <p id="progressText" aria-live="polite">准备就绪</p>
-            </div>
-            <button id="clearAllBtn" type="button" class="btn btn-ghost">清空所有</button>
-            <button id="stitchBtn" type="button" class="btn btn-primary" disabled>开始拼图</button>
-        </nav>
-    </div>
-
-    <!-- 全屏预览浮层 -->
-    <div class="preview-overlay" id="previewOverlay" hidden>
-        <div class="preview-shell" role="dialog" aria-label="长图预览">
-            <header class="preview-head">
-                <button type="button" class="icon-btn flip" id="previewPrev" data-icon="chevron" aria-label="上一组"></button>
-                <span class="preview-meta"><span id="previewTitle">第 1 组</span><span class="preview-dims" id="previewDims"></span></span>
-                <button type="button" class="icon-btn" id="previewNext" data-icon="chevron" aria-label="下一组"></button>
-                <button type="button" class="icon-btn" id="previewClose" data-icon="x" aria-label="关闭"></button>
-            </header>
-            <div class="preview-scroll"><canvas id="previewCanvas"></canvas></div>
-        </div>
-    </div>
-
-    <!-- 结果卡片 -->
-    <div class="result-overlay" id="resultOverlay" hidden>
-        <div class="result-card" role="dialog" aria-label="拼接结果">
-            <h3>拼好啦 <span class="brand-mark">✿</span></h3>
-            <div class="result-list" id="resultList"></div>
-            <div class="result-actions">
-                <button type="button" class="btn btn-ghost" id="resultCloseBtn">完成</button>
-                <button type="button" class="btn btn-primary" id="saveAllBtn">全部保存</button>
-            </div>
-        </div>
-    </div>
-
-    <script src="script.js"></script>
-</body>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
 </html>

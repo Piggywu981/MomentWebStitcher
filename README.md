@@ -1,25 +1,32 @@
 # MomentWebStitcher
 
-网页版朋友圈长图拼接工具：把多张照片按分组垂直拼接成适合社交分享的长图。项目采用纯前端实现，图片处理在浏览器本地完成，图片数据不会上传服务器。
+网页版朋友圈长图拼接工具：把多张照片按分组垂直拼接成适合社交分享的长图。项目为纯前端实现，图片读取、排序、拼接和压缩全部在浏览器本地完成，**图片数据不会上传服务器**；拼接在 Web Worker 后台线程执行，不阻塞界面。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Processing: Browser Only](https://img.shields.io/badge/Processing-Browser--Only-blue.svg)](https://developer.mozilla.org/docs/Web/API/Canvas_API)
+[![Build: Vite](https://img.shields.io/badge/Build-Vite-6BA81E.svg)](https://vitejs.dev/)
+[![Language: TypeScript](https://img.shields.io/badge/Language-TypeScript-3178C6.svg)](https://www.typescriptlang.org/)
+[![Tests: Vitest](https://img.shields.io/badge/Tests-Vitest-6E9F18.svg)](https://vitest.dev/)
 [![Deploy: GitHub Pages](https://img.shields.io/badge/Deploy-GitHub%20Pages-success.svg)](https://piggywu981.github.io/MomentWebStitcher/)
 
 **在线使用：** <https://piggywu981.github.io/MomentWebStitcher/>
+**旧版入口：** <https://piggywu981.github.io/MomentWebStitcher/legacy/>
 
-![MomentWebStitcher 空状态主界面](docs/images/app-empty.png)
+> 本项目为 **rewrite（重写版）**：基于 Vite + TypeScript 的模块化实现。若需纯静态版，可使用上方旧版入口（见「新旧版本」章节）。
 
 ## 功能特性
 
-- **批量上传：** 支持点击选择或拖拽添加多张图片。
+- **批量上传：** 支持点击选择或拖拽添加多张图片，单张不超过 50 MB、单次最多 200 张。
 - **自动分组：** 自定义每组图片数量，一键生成多个分组；默认值为 9 张。
-- **拍摄时间排序：** 优先读取 EXIF 拍摄时间，按早到晚排序；没有拍摄时间时使用文件修改时间，并排在有 EXIF 时间的图片之后。
-- **拖拽整理：** 图片可以在图片池和分组之间移动，也可以在组内拖拽调整顺序，按照落点插入。
-- **触屏操作：** 手机和平板支持长按拖拽、震动反馈和防误触阈值。
-- **实时预览：** 分组卡片显示迷你长图预览，可打开全屏预览查看输出尺寸。
-- **批量保存：** 拼接完成后，在结果卡片中单张保存或全部保存。
-- **本地处理：** 使用 Canvas API 完成拼接和压缩，运行时不需要后端服务。
+- **时间排序：** 优先按修改时间排序（图片 `src` 为本地 Data URL，可在上传流程中扩展 EXIF 读取）。
+- **拖拽整理：** 图片可以在图片池和分组之间移动，也可以在组内拖拽调整顺序。
+- **Web Worker 后台拼接：** 使用 `OffscreenCanvas` + `ImageBitmap` 在后台线程完成缩放与垂直拼接，界面不卡顿，并支持进度反馈。
+- **撤销 / 重做：** 基于命令模式（Command Pattern）管理完整操作历史，支持 50 步。
+- **本地持久化：** 图片数据存入 **IndexedDB**，界面状态以轻量元数据存入 **localStorage**，刷新页面不丢失。
+- **结果预览：** 拼接完成后在「拼接结果」区预览每个分组的合成图，支持单条下载与一键下载全部。
+- **暗色 / 亮色主题：** 响应式设计，跟随系统或手动切换。
+- **移动端适配：** 支持手机和平板的触屏拖拽。
+- **快捷键支持：** 常用操作均有键盘快捷键。
+- **版本切换：** 内置新版 / 旧版切换入口。
 
 ## 快速开始
 
@@ -29,154 +36,192 @@
 
 ### 本地运行
 
-项目是无需构建的静态网站，使用任意静态文件服务器即可启动：
-
 ```bash
 git clone https://github.com/Piggywu981/MomentWebStitcher.git
 cd MomentWebStitcher
+
+# 安装依赖
+npm install
+
+# 启动开发服务器（默认 http://localhost:5173）
 npm run dev
+
+# 构建生产版本（输出到 dist/）
+npm run build
 ```
 
-然后访问 <http://localhost:8000>。
-
-也可以直接运行：
-
-```bash
-python -m http.server 8000
-```
-
-部分浏览器支持直接双击 `index.html` 打开，但使用静态服务器更稳定。
+> 本项目是构建型工程，需要 **Node.js 18+** 环境（与旧版纯静态站不同）。
 
 ## 使用流程
 
 ### 1. 上传照片
 
-将照片拖入图片池，或点击「选择图片」批量添加。上传后，应用会读取可用的 EXIF 拍摄时间并完成排序。
+将照片拖入上传区域，或点击选择图片文件批量添加。支持 JPG / PNG / WebP / BMP 等格式。
 
 ### 2. 分组整理
 
-在右侧设置每组图片数量，点击「自动分组」。需要更细致的调整时，可以：
+在「分组管理」中设置每组数量并点击「自动分组」，或手动「新建分组」。随后可以：
 
-- 将图片从图片池拖到指定分组；
+- 将图片从图片池拖拽到指定分组；
 - 在分组之间移动图片；
 - 在同一分组内拖拽调整顺序；
-- 使用分组右侧的清空按钮，把该组移除；
-- 使用展开按钮查看该组的长图预览。
+- 点分组「清空」释放该组图片、「删除」移除分组。
 
-![上传图片并自动分组后的界面](docs/images/app-grouped.png)
+### 3. 设置输出参数
 
-### 3. 预览拼接结果
+在右侧「输出设置」中调整输出质量（70%～100%，默认 95%）与输出格式（JPEG / PNG / WebP）。
 
-点击分组卡片上的预览按钮，打开全屏预览浮层。预览头部会显示当前分组、图片数量和输出尺寸。
+### 4. 开始拼接
 
-![全屏长图预览](docs/images/app-preview.png)
+点击「开始拼接」，应用会逐组处理可拼接的分组并显示进度；拼接在 Web Worker 后台执行。
 
-### 4. 保存结果
+### 5. 预览与下载
 
-点击底部「开始拼图」按钮，应用会逐组处理可拼接的分组并显示进度。处理完成后，结果卡片会列出生成的 JPG 文件，可以单张保存，也可以点击「全部保存」。
+处理完成后，结果会在左侧「拼接结果」区生成卡片预览（含分组名与输出尺寸）。可点击单个「下载」，或「下载全部」一次保存。
 
-![拼接完成后的结果卡片](docs/images/app-result.png)
+## 快捷键
 
-## 触屏手势
-
-| 操作 | 说明 |
+| 快捷键 | 功能 |
 | --- | --- |
-| 长按约 400 ms 后移动 | 开始拖拽图片 |
-| 拖到目标分组后松手 | 按落点位置插入图片 |
-| 在同组内拖动 | 调整图片顺序 |
-| 拖回图片池 | 将图片从分组移回待分组区域 |
-| 点击缩略图上的关闭按钮 | 删除图片 |
-| 轻微移动后松手 | 不触发拖拽，避免误操作 |
+| Ctrl / Cmd + O | 添加图片 |
+| Ctrl / Cmd + Enter | 开始拼接 |
+| Ctrl / Cmd + Z | 撤销 |
+| Ctrl / Cmd + Y 或 Ctrl / Cmd + Shift + Z | 重做 |
+| Ctrl + Shift + C | 清空所有 |
 
 ## 输出规则
 
-- **拼接方向：** 当前版本只支持垂直拼接。
-- **质量范围：** 输出质量可设置为 70%～100%，默认值为 95%。
-- **输出宽度：** 取分组内最小原图宽度，并限制在 1080 px 以内；超过限制时等比缩小。
-- **画布面积：** 总面积上限为 16,777,216 px²，用于降低移动端 Safari 生成空白长图的概率。
-- **输出文件：** 每个包含至少 2 张图片的分组生成一个 JPG 文件；只有 1 张图片的分组会被跳过并提示。
+- **拼接方向：** 当前版本仅支持垂直拼接。
+- **质量范围：** 输出质量 70%～100%，默认 95%。
+- **输出宽度：** 取分组内所有图片的最小原图宽度。
+- **输出格式：** JPEG / PNG / WebP，默认为 JPEG。
+- **分组限制：** 每个包含至少 2 张图片的分组生成一个文件；仅 1 张图片的分组会被跳过并提示。
+- **文件名：** `分组名_时间戳.格式`，避免同名覆盖。
 
 ## 支持格式与兼容性
 
 ### 图片格式
 
-常见的 JPEG / JPG、PNG、WebP、GIF 和 BMP 图片通常可以直接处理。实际支持范围取决于浏览器的图片解码能力。
-
-浏览器无法解码的格式（例如部分 iPhone HEIC 原图）会被跳过并提示。遇到这种情况，请先转换为 JPG 或 PNG。
+常见的 JPEG / JPG、PNG、WebP、BMP、TIFF 等图片通常可以直接处理，实际支持范围取决于浏览器解码能力。浏览器无法解码的格式（例如部分 iPhone 的 HEIC 原图）会被跳过并提示，建议先转换为 JPG 或 PNG。
 
 ### 浏览器
 
+需支持 `OffscreenCanvas` 与 `createImageBitmap`，建议：
+
 - Chrome 90+
-- Firefox 88+
-- Safari 14+
+- Firefox 100+
+- Safari 16.4+
 - Edge 90+
 
 ## 技术实现
 
-![MomentWebStitcher 的处理界面与流程](docs/images/app-grouped.png)
-
-- **页面：** HTML5、CSS3、原生 JavaScript（ES6+）。
-- **图片处理：** Canvas API，负责缩放、垂直拼接和 JPEG 压缩。
-- **文件排序：** `exif-js` 读取 EXIF 时间；脚本通过 cdnjs 加载该依赖，并配置了 SRI 完整性校验。
-- **交互：** 原生 Drag & Drop API、Touch Events API 和 Vibration API。
-- **响应式布局：** CSS Grid、Flexbox 和媒体查询适配桌面、手机与平板。
-- **部署：** GitHub Actions 自动发布到 GitHub Pages。
+- **构建工具：** Vite 6（`worker.format: 'es'`，`base: './'`）。
+- **语言：** TypeScript（严格模式）。
+- **样式：** Tailwind CSS + CSS 自定义属性（暗色 / 亮色主题）。
+- **测试：** Vitest（jsdom 环境）。
+- **代码规范：** ESLint + Prettier。
+- **UI 层：** 原生 DOM 工厂函数 + 事件总线（不依赖 Vue / React 等框架）。
+- **状态层：** `AppState` 单例 + 命令模式（撤销 / 重做）。
+- **拼接层：** Web Worker 内使用 `OffscreenCanvas` + `ImageBitmap`。
+- **存储层：** 图片二进制存 IndexedDB，界面状态（分组、图片元数据、设置）存 localStorage。
+- **部署：** GitHub Actions 自动发布 GitHub Pages，`base: './'` 兼容子路径，`public/legacy` 一并发布旧版。
 
 ## 项目结构
 
 ```text
 MomentWebStitcher/
-├── index.html                     # 主页面与浮层结构
-├── style.css                      # 主题、响应式布局和交互样式
-├── script.js                      # 上传、分组、预览、拼接与保存逻辑
+├── index.html                  # 入口 HTML
+├── vite.config.ts              # Vite 配置（base:'./'、worker es、@ 别名）
+├── vitest.config.ts            # Vitest 配置
+├── tailwind.config.js          # Tailwind 配置
+├── tsconfig.json               # TypeScript 配置
+├── src/
+│   ├── main.ts                 # 应用入口与布局装配
+│   ├── core/
+│   │   ├── state.ts            # AppState 单例（状态 + 命令分发 + 自动保存）
+│   │   ├── commands.ts         # 命令模式（撤销 / 重做，含 IndexedDB 副作用）
+│   │   ├── storage.ts          # IndexedDB 图片存储 + localStorage 状态
+│   │   ├── worker.ts           # Web Worker 管理
+│   │   └── events.ts           # 事件总线与事件常量
+│   ├── components/
+│   │   ├── upload/             # 上传区域
+│   │   ├── image-pool/         # 图片池
+│   │   ├── group-manager/      # 分组管理
+│   │   ├── results/            # 拼接结果预览
+│   │   ├── settings/           # 设置面板
+│   │   └── common/             # 按钮 / Toast / Modal / 进度条
+│   ├── workers/
+│   │   └── imageProcessor.ts   # 图片拼接 Worker（OffscreenCanvas）
+│   ├── utils/                  # 工具函数与常量
+│   ├── styles/                 # 变量与动画样式
+│   └── types/                  # TypeScript 类型
+├── public/
+│   ├── vite.svg
+│   └── legacy/                 # 旧版静态站（含切换入口，随构建发布）
 ├── tests/
-│   ├── smoke.test.js              # Playwright 冒烟测试
-│   └── smoke-after.png            # 测试运行后的截图产物
-├── docs/
-│   ├── images/                    # README 配图
-│   └── superpowers/               # 设计与实现记录
-├── .github/workflows/deploy.yml   # GitHub Pages 部署工作流
-├── package.json
-└── LICENSE
+│   └── unit/                   # 单元测试（helpers / state / persistence）
+├── .github/workflows/deploy.yml  # GitHub Pages 部署工作流
+└── package.json
 ```
 
 ## 开发与测试
 
-运行冒烟测试前，安装开发依赖和 Chromium：
-
 ```bash
-npm install -D playwright
-npx playwright install chromium
-npm test
+# 安装依赖
+npm install
+
+# 开发
+npm run dev
+
+# 类型检查 + 构建
+npm run build
+
+# 单元测试（Vitest）
+npm run test
+
+# 代码检查（ESLint）
+npm run lint
 ```
 
-测试覆盖上传、EXIF 排序、无法解码格式处理、鼠标拖拽、触屏手势、迷你预览、全屏预览和结果卡片等主流程。Playwright 仅用于本地测试，不影响线上版本的零后端运行方式。
+测试覆盖工具函数、状态管理（命令 / 撤销 / 重做 / 自动分组）以及持久化往返（IndexedDB + localStorage）。
 
 ## 部署
 
-推送到 `main` 分支后，GitHub Actions 会根据 `.github/workflows/deploy.yml` 发布静态文件。首次启用 GitHub Pages 时，请在仓库的 Settings → Pages 中确认发布来源为工作流或 `gh-pages` 分支，具体以仓库当前配置为准。
+推送到 `rewrite` 分支后，GitHub Actions 会根据 `.github/workflows/deploy.yml` 构建并发布到 GitHub Pages：
+
+- 步骤：checkout → setup Node 20 → `npm ci` → `npm run build` → configure-pages → upload artifact（`dist`）→ deploy-pages。
+- 首次启用需在仓库 **Settings → Pages → Source** 选择 **GitHub Actions**。
+
+部署完成后：新版位于根目录，旧版位于 `legacy/`。
+
+## 新旧版本
+
+- **新版（本分支，rewrite）：** Vite + TypeScript 模块化实现，带 Web Worker、持久化、撤销重做、结果预览与批量下载。
+- **旧版（main 分支）：** 纯静态单文件实现（`index.html` + `style.css` + `script.js`），无构建步骤、直接部署。
+
+新版页头提供「旧版」入口（跳转 `./legacy/index.html`），旧版页头提供「返回新版」入口（跳转 `../index.html`），可随时在两个版本间切换。旧版源码随构建发布到 `dist/legacy/`，因此只需一个 Pages 地址即可同时访问两版。
 
 ## 常见问题
 
 ### 图片会上传到服务器吗？
 
-不会。图片读取、排序、拼接和压缩都在当前浏览器页面中完成。项目只会从 cdnjs 加载 `exif-js` 脚本，不会上传照片内容。
+不会。图片读取、排序、拼接和压缩都在当前浏览器页面中完成，图片数据仅存储在本地 IndexedDB，不会上传。
 
-### 为什么处理速度较慢？
+### 刷新页面会丢失工作吗？
 
-拼接工作由浏览器完成，大尺寸原图会占用更多内存和 CPU。建议减少单次处理的图片数量、使用合理大小的原图，并关闭其他占用资源的标签页。
+不会。图片存于 IndexedDB，分组与设置以轻量元数据存于 localStorage，自动防抖保存。清空操作同样会同步清除本地存储。
 
-### 有文件大小限制吗？
+### 有文件大小 / 数量限制吗？
 
-项目没有额外设置单文件大小限制，但浏览器和设备的内存会限制实际可处理规模。建议单张图片不超过 10 MB，单次处理不超过 50 张。
+单张图片上限 50 MB，单次最多 200 张；受浏览器内存与 `OffscreenCanvas` 面积限制，处理超大数量原图时建议分批。
 
-### 如何调整照片顺序？
+### 为什么需要 Node.js？
 
-在分组内拖拽即可调整顺序，也可以把图片拖回图片池后重新分组。
+本分支为构建型工程（Vite + TypeScript），需要 `npm install` 与 `npm run build`；若希望免构建，请切换到旧版入口。
 
-### 可以横向拼接吗？
+### 和旧版有什么区别？
 
-当前版本只支持垂直拼接。
+旧版是免构建的纯静态站；重写版引入了 Web Worker 后台拼接、IndexedDB 持久化、撤销 / 重做、结果预览与批量下载，并以 TypeScript 模块化分层，便于长期维护。
 
 ## 贡献
 
@@ -185,3 +230,7 @@ npm test
 ## 许可证
 
 本项目采用 [MIT License](LICENSE)。
+
+---
+
+Made with ❤️ by [Piggywu981](https://github.com/Piggywu981)
