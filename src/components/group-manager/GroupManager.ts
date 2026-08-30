@@ -151,12 +151,7 @@ export function createGroupManager(): HTMLDivElement {
 
 function createGroupElement(group: ImageGroup, index: number): HTMLDivElement {
   const container = document.createElement('div')
-  container.className = [
-    'bg-surface-secondary',
-    'rounded-xl',
-    'p-4',
-    'animate-slide-up',
-  ].join(' ')
+  container.className = ['bg-surface-secondary', 'rounded-xl', 'p-4', 'animate-slide-up'].join(' ')
   container.style.animationDelay = `${index * 0.05}s`
 
   // Header
@@ -236,12 +231,20 @@ function createGroupElement(group: ImageGroup, index: number): HTMLDivElement {
   })
 
   imagesContainer.addEventListener('dragleave', () => {
-    imagesContainer.classList.remove('border-primary-500', 'bg-primary-50', 'dark:bg-primary-900/20')
+    imagesContainer.classList.remove(
+      'border-primary-500',
+      'bg-primary-50',
+      'dark:bg-primary-900/20'
+    )
   })
 
   imagesContainer.addEventListener('drop', (e) => {
     e.preventDefault()
-    imagesContainer.classList.remove('border-primary-500', 'bg-primary-50', 'dark:bg-primary-900/20')
+    imagesContainer.classList.remove(
+      'border-primary-500',
+      'bg-primary-50',
+      'dark:bg-primary-900/20'
+    )
 
     const imageId = e.dataTransfer?.getData('imageId')
     if (imageId) {

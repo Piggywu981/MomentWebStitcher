@@ -113,7 +113,9 @@ async function stitchImages(
   }
 }
 
-async function loadImage(src: string): Promise<{ bitmap: ImageBitmap; width: number; height: number }> {
+async function loadImage(
+  src: string
+): Promise<{ bitmap: ImageBitmap; width: number; height: number }> {
   const response = await fetch(src)
   if (!response.ok) {
     throw new Error(`Failed to fetch image: ${src}`)

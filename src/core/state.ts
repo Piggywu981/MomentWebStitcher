@@ -1,6 +1,15 @@
 import type { AppState as IAppState, ImageItem, ImageGroup, AppSettings } from '@/types'
 import { DEFAULT_SETTINGS } from '@/utils/constants'
-import { CommandManager, createAddImagesCommand, createRemoveImageCommand, createCreateGroupCommand, createDeleteGroupCommand, createAddToGroupCommand, createRemoveFromGroupCommand, createClearAllCommand } from './commands'
+import {
+  CommandManager,
+  createAddImagesCommand,
+  createRemoveImageCommand,
+  createCreateGroupCommand,
+  createDeleteGroupCommand,
+  createAddToGroupCommand,
+  createRemoveFromGroupCommand,
+  createClearAllCommand,
+} from './commands'
 import { eventBus, Events } from './events'
 import { storage } from './storage'
 
@@ -144,8 +153,18 @@ export class AppState implements IAppState {
     try {
       const savedState = await storage.getState()
       if (savedState) {
-        this.images = savedState.images || []
-        this.groups = savedState.groups || []
+        // Convert dateTime strings back to Date objects
+        this.images = (savedState.images || []).map((img) => ({
+          ...img,
+          dateTime: new Date(img.dateTime),
+        }))
+        this.groups = (savedState.groups || []).map((group) => ({
+          ...group,
+          images: group.images.map((img) => ({
+            ...img,
+            dateTime: new Date(img.dateTime),
+          })),
+        }))
         this.settings = { ...DEFAULT_SETTINGS, ...savedState.settings }
       }
 

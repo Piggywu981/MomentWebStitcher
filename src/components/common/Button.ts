@@ -97,7 +97,8 @@ export function createButton(props: ButtonProps): HTMLButtonElement {
   // Content
   if (loading) {
     const spinner = document.createElement('span')
-    spinner.className = 'animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full'
+    spinner.className =
+      'animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full'
     button.appendChild(spinner)
   } else if (icon) {
     const iconSpan = document.createElement('span')

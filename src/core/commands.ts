@@ -54,10 +54,7 @@ export class CommandManager {
   }
 }
 
-export function createAddImagesCommand(
-  state: AppState,
-  images: ImageItem[]
-): Command {
+export function createAddImagesCommand(state: AppState, images: ImageItem[]): Command {
   return {
     type: 'ADD_IMAGES' as CommandType,
     payload: images,
@@ -71,10 +68,7 @@ export function createAddImagesCommand(
   }
 }
 
-export function createRemoveImageCommand(
-  state: AppState,
-  imageId: string
-): Command {
+export function createRemoveImageCommand(state: AppState, imageId: string): Command {
   const index = state.images.findIndex((img) => img.id === imageId)
   const image = state.images[index]
   const groupIndices: number[] = []
@@ -103,10 +97,7 @@ export function createRemoveImageCommand(
   }
 }
 
-export function createCreateGroupCommand(
-  state: AppState,
-  group: ImageGroup
-): Command {
+export function createCreateGroupCommand(state: AppState, group: ImageGroup): Command {
   return {
     type: 'CREATE_GROUP' as CommandType,
     payload: group,
@@ -119,10 +110,7 @@ export function createCreateGroupCommand(
   }
 }
 
-export function createDeleteGroupCommand(
-  state: AppState,
-  groupId: string
-): Command {
+export function createDeleteGroupCommand(state: AppState, groupId: string): Command {
   const index = state.groups.findIndex((g) => g.id === groupId)
   const group = state.groups[index]
 

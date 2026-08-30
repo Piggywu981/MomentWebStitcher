@@ -46,7 +46,7 @@ export interface ProcessingProgress {
   message: string
 }
 
-export type CommandType = 
+export type CommandType =
   | 'ADD_IMAGES'
   | 'REMOVE_IMAGE'
   | 'CREATE_GROUP'

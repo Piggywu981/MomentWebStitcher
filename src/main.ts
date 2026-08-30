@@ -181,19 +181,26 @@ function setupEventListeners(): void {
           appState.settings.outputQuality,
           appState.settings.outputFormat,
           (progress) => {
-            const overallProgress = ((i + progress.current / progress.total) / appState.groups.length) * 100
+            const overallProgress =
+              ((i + progress.current / progress.total) / appState.groups.length) * 100
             appState.setProgress(overallProgress, progress.message)
           }
         )
 
         // Download
-        downloadBlob(result.blob, `stitched_${group.name}_${Date.now()}.${appState.settings.outputFormat}`)
+        downloadBlob(
+          result.blob,
+          `stitched_${group.name}_${Date.now()}.${appState.settings.outputFormat}`
+        )
       }
 
       showToast({ message: '所有分组处理完成', type: 'success' })
     } catch (error) {
       console.error('Stitching error:', error)
-      showToast({ message: '处理失败: ' + (error instanceof Error ? error.message : '未知错误'), type: 'error' })
+      showToast({
+        message: '处理失败: ' + (error instanceof Error ? error.message : '未知错误'),
+        type: 'error',
+      })
     } finally {
       appState.setProcessing(false)
       appState.setProgress(0, '')

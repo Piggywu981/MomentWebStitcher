@@ -56,10 +56,7 @@ export async function readFileAsDataURL(file: File): Promise<string> {
   })
 }
 
-export async function createThumbnail(
-  src: string,
-  maxSize: number = 200
-): Promise<string> {
+export async function createThumbnail(src: string, maxSize: number = 200): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image()
     img.crossOrigin = 'anonymous'

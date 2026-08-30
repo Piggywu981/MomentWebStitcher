@@ -181,7 +181,7 @@ async function processFile(file: File): Promise<ImageItem | null> {
     const thumbnail = await createThumbnail(src, 200)
 
     // Get date from EXIF or file
-    let dateTime = new Date(file.lastModified)
+    const dateTime = new Date(file.lastModified)
 
     return {
       id: generateId(),
