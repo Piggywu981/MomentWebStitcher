@@ -44,6 +44,7 @@ function initApp(): void {
           </div>
         </div>
         <div class="flex items-center gap-2">
+          <a href="./legacy/index.html" class="px-3 py-1.5 rounded-lg text-sm bg-surface-secondary hover:bg-surface-tertiary text-text-secondary transition-colors" title="切换旧版">旧版</a>
           <a href="https://github.com/Piggywu981/MomentWebStitcher" target="_blank" rel="noopener" 
              class="p-2 rounded-lg hover:bg-surface-secondary transition-colors" title="GitHub">
             <svg class="w-6 h-6 text-text-secondary" fill="currentColor" viewBox="0 0 24 24">
