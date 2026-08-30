@@ -1,12 +1,30 @@
 import type { ToastType } from '@/types'
 
+// Inline SVG icon set (stroke=currentColor, 24 viewBox) — replaces emoji/glyphs
+export const ICONS = {
+  play: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4l14 8-14 8V4z"></path></svg>`,
+  trash: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14zM10 11v6M14 11v6"></path></svg>`,
+  undo: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5M4 9h10.5A5.5 5.5 0 0120 14.5 5.5 5.5 0 0114.5 20H11"></path></svg>`,
+  redo: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14l5-5-5-5M20 9H9.5A5.5 5.5 0 004 14.5 5.5 5.5 0 009.5 20H13"></path></svg>`,
+  download: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"></path></svg>`,
+  x: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>`,
+  plus: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>`,
+  image: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>`,
+  sliders: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"></path></svg>`,
+  check: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>`,
+  info: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 16v-4M12 8h.01"></path></svg>`,
+  warning: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.86L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.86a2 2 0 00-3.4 0z"></path></svg>`,
+  error: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M15 9l-6 6M9 9l6 6"></path></svg>`,
+} as const
+
 interface ButtonProps {
   text?: string
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost'
   size?: 'sm' | 'md' | 'lg'
   disabled?: boolean
   loading?: boolean
-  icon?: string
+  icon?: keyof typeof ICONS | string
+  ariaLabel?: string
   className?: string
   onClick?: (e: MouseEvent) => void
 }
@@ -19,6 +37,7 @@ export function createButton(props: ButtonProps): HTMLButtonElement {
     disabled = false,
     loading = false,
     icon,
+    ariaLabel,
     className = '',
     onClick,
   } = props
@@ -93,6 +112,7 @@ export function createButton(props: ButtonProps): HTMLButtonElement {
   ].join(' ')
 
   button.disabled = disabled || loading
+  if (ariaLabel) button.setAttribute('aria-label', ariaLabel)
 
   // Content
   if (loading) {
@@ -102,7 +122,8 @@ export function createButton(props: ButtonProps): HTMLButtonElement {
     button.appendChild(spinner)
   } else if (icon) {
     const iconSpan = document.createElement('span')
-    iconSpan.textContent = icon
+    iconSpan.className = 'inline-flex shrink-0'
+    iconSpan.innerHTML = ICONS[icon as keyof typeof ICONS] || icon
     button.appendChild(iconSpan)
   }
 
@@ -138,10 +159,10 @@ export function showToast(props: ToastProps): void {
   }
 
   const typeIcons = {
-    success: '✓',
-    error: '✕',
-    warning: '⚠',
-    info: 'ℹ',
+    success: 'check',
+    error: 'error',
+    warning: 'warning',
+    info: 'info',
   }
 
   toast.className = [
@@ -162,7 +183,7 @@ export function showToast(props: ToastProps): void {
   ].join(' ')
 
   toast.innerHTML = `
-    <span class="text-lg">${typeIcons[type]}</span>
+    <span class="inline-flex shrink-0">${ICONS[typeIcons[type] as keyof typeof ICONS]}</span>
     <span class="font-medium">${message}</span>
   `
 
@@ -226,7 +247,8 @@ export function createModal(props: ModalProps): HTMLDivElement {
   const closeBtn = createButton({
     variant: 'ghost',
     size: 'sm',
-    text: '✕',
+    icon: 'x',
+    ariaLabel: '关闭',
     onClick: () => {
       close()
       onClose?.()

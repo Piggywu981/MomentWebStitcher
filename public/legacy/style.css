@@ -1,4 +1,4 @@
-﻿/* ============================================
+/* ============================================
    MomentStitcher · 柔和奶油设计语言
    令牌驱动，亮/暗双主题（规格 §2）
    ============================================ */
@@ -77,10 +77,43 @@ body::before {
 .app { position: relative; z-index: 1; width: 100%; max-width: 1280px; margin: auto; }
 
 /* 页头 */
-.app-header { padding: 6px 4px 14px; }
+.app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 6px 4px 14px;
+}
+.app-header .brand { display: flex; flex-direction: column; }
 .app-header h1 { font-size: 22px; font-weight: 800; display: inline; letter-spacing: .5px; }
 .brand-mark { color: var(--primary); }
 .tagline { font-size: 13px; color: var(--text-2); margin-top: 2px; }
+
+/* 版本切换按钮 */
+.version-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    padding: 9px 18px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+    color: #fff;
+    background: linear-gradient(135deg, var(--primary), var(--primary-strong));
+    box-shadow: 0 4px 12px rgba(255, 122, 77, .35);
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: transform var(--dur) ease-out, box-shadow var(--dur) ease-out, filter var(--dur) ease-out;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+.version-switch:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(255, 122, 77, .45); filter: brightness(1.03); }
+.version-switch:active { transform: scale(.96); }
+.version-switch svg { flex-shrink: 0; }
 
 /* 双栏工作区 */
 .workspace {

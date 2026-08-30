@@ -16,7 +16,7 @@ function initApp(): void {
   if (!app) return
 
   // Create layout
-  app.className = 'min-h-screen bg-surface'
+  app.className = 'min-h-screen bg-bg'
 
   // Header
   const header = document.createElement('header')
@@ -24,7 +24,7 @@ function initApp(): void {
     'sticky',
     'top-0',
     'z-40',
-    'bg-surface/80',
+    'bg-bg',
     'backdrop-blur-md',
     'border-b',
     'border-border',

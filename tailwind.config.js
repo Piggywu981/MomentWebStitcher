@@ -9,20 +9,20 @@ export default {
     extend: {
       colors: {
         primary: {
-          50: '#f0f4ff',
-          100: '#e0e7ff',
-          200: '#c7d2fe',
-          300: '#a5b4fc',
-          400: '#818cf8',
-          500: '#6366f1',
-          600: '#4f46e5',
-          700: '#4338ca',
-          800: '#3730a3',
-          900: '#312e81',
+          50: '#FFF5EF',
+          100: '#FFE9DC',
+          200: '#FFD4BD',
+          300: '#FFA882',
+          400: '#FF9068',
+          500: '#FF7A4D',
+          600: '#F0663A',
+          700: '#D2522C',
+          800: '#AE3E1F',
+          900: '#832F18',
         },
         surface: {
-          light: '#ffffff',
-          dark: '#1e1e2e',
+          light: '#FFFDF9',
+          dark: '#2A211B',
         },
       },
       animation: {

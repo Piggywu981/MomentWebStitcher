@@ -41,9 +41,9 @@ export function createSettingsPanel(): HTMLDivElement {
   const themeControl = createSelectControl({
     label: '主题',
     options: [
-      { value: 'light', label: '☀️ 浅色' },
-      { value: 'dark', label: '🌙 深色' },
-      { value: 'system', label: '💻 跟随系统' },
+      { value: 'light', label: '浅色' },
+      { value: 'dark', label: '深色' },
+      { value: 'system', label: '跟随系统' },
     ],
     value: appState.settings.theme,
     onChange: (value) => {
@@ -63,7 +63,8 @@ export function createSettingsPanel(): HTMLDivElement {
 
   // Stitch button
   const stitchBtn = createButton({
-    text: '🚀 开始拼接',
+    text: '开始拼接',
+    icon: 'play',
     variant: 'primary',
     size: 'lg',
     className: 'col-span-2',
@@ -80,7 +81,8 @@ export function createSettingsPanel(): HTMLDivElement {
   // Clear button
   actionsGrid.appendChild(
     createButton({
-      text: '🗑️ 清空所有',
+      text: '清空所有',
+      icon: 'trash',
       variant: 'secondary',
       onClick: () => {
         if (confirm('确定要清空所有图片和分组吗？')) {
@@ -93,7 +95,8 @@ export function createSettingsPanel(): HTMLDivElement {
 
   // Undo/Redo buttons
   const undoBtn = createButton({
-    text: '↩️ 撤销',
+    text: '撤销',
+    icon: 'undo',
     variant: 'ghost',
     onClick: () => {
       if (appState.undo()) {
@@ -104,7 +107,8 @@ export function createSettingsPanel(): HTMLDivElement {
   actionsGrid.appendChild(undoBtn)
 
   const redoBtn = createButton({
-    text: '↪️ 重做',
+    text: '重做',
+    icon: 'redo',
     variant: 'ghost',
     onClick: () => {
       if (appState.redo()) {

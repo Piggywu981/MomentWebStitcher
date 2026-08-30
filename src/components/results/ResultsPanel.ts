@@ -31,7 +31,8 @@ export function createResultsPanel(): HTMLDivElement {
   actions.className = 'flex items-center gap-2'
 
   const downloadAllBtn = createButton({
-    text: '⬇️ 下载全部',
+    text: '下载全部',
+    icon: 'download',
     variant: 'primary',
     size: 'sm',
     disabled: true,
@@ -126,6 +127,7 @@ export function createResultsPanel(): HTMLDivElement {
       card.appendChild(
         createButton({
           text: '下载',
+          icon: 'download',
           variant: 'secondary',
           size: 'sm',
           onClick: () => {
