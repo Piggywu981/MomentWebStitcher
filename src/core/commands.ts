@@ -1,5 +1,6 @@
 import type { Command, CommandType, ImageItem, ImageGroup, AppSettings } from '@/types'
 import type { AppState } from './state'
+import { storage } from './storage'
 
 export class CommandManager {
   private history: Command[] = []
@@ -61,9 +62,11 @@ export function createAddImagesCommand(state: AppState, images: ImageItem[]): Co
     undo: () => {
       const ids = new Set(images.map((img) => img.id))
       state.images = state.images.filter((img) => !ids.has(img.id))
+      images.forEach((img) => storage.deleteImage(img.id))
     },
     redo: () => {
       state.images.push(...images)
+      images.forEach((img) => storage.saveImage(img))
     },
   }
 }
@@ -86,6 +89,7 @@ export function createRemoveImageCommand(state: AppState, imageId: string): Comm
     undo: () => {
       if (image) {
         state.images.splice(index, 0, image)
+        storage.saveImage(image)
       }
     },
     redo: () => {
@@ -93,6 +97,7 @@ export function createRemoveImageCommand(state: AppState, imageId: string): Comm
       state.groups.forEach((group) => {
         group.images = group.images.filter((img) => img.id !== imageId)
       })
+      storage.deleteImage(imageId)
     },
   }
 }
@@ -207,6 +212,26 @@ export function createReorderGroupCommand(
   }
 }
 
+export function createClearGroupCommand(state: AppState, groupId: string): Command {
+  const group = state.groups.find((g) => g.id === groupId)
+  const previousImages = group ? [...group.images] : []
+
+  return {
+    type: 'CLEAR_GROUP' as CommandType,
+    payload: groupId,
+    undo: () => {
+      if (group) {
+        group.images = [...previousImages]
+      }
+    },
+    redo: () => {
+      if (group) {
+        group.images = []
+      }
+    },
+  }
+}
+
 export function createClearAllCommand(state: AppState): Command {
   const previousImages = [...state.images]
   const previousGroups = [...state.groups]
@@ -217,10 +242,12 @@ export function createClearAllCommand(state: AppState): Command {
     undo: () => {
       state.images = previousImages
       state.groups = previousGroups
+      previousImages.forEach((img) => storage.saveImage(img))
     },
     redo: () => {
       state.images = []
       state.groups = []
+      previousImages.forEach((img) => storage.deleteImage(img.id))
     },
   }
 }

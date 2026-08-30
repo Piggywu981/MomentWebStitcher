@@ -141,6 +141,8 @@ export function createGroupManager(): HTMLDivElement {
   eventBus.on(Events.GROUP_UPDATED, updateGroups)
   eventBus.on(Events.IMAGE_ADDED_TO_GROUP, updateGroups)
   eventBus.on(Events.IMAGE_REMOVED_FROM_GROUP, updateGroups)
+  eventBus.on(Events.UNDO, updateGroups)
+  eventBus.on(Events.REDO, updateGroups)
   eventBus.on(Events.STATE_RESET, updateGroups)
 
   // Initial render
@@ -179,8 +181,7 @@ function createGroupElement(group: ImageGroup, index: number): HTMLDivElement {
       variant: 'ghost',
       size: 'sm',
       onClick: () => {
-        group.images = []
-        eventBus.emit(Events.STATE_CHANGED)
+        appState.clearGroupImages(group.id)
         showToast({ message: '分组已清空', type: 'success' })
       },
     })

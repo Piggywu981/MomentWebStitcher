@@ -1,9 +1,9 @@
-import type { ImageItem, ImageGroup, AppSettings } from '@/types'
+import type { ImageItem, ImageItemMeta, GroupMeta, AppSettings } from '@/types'
 import { DB_CONFIG, STORAGE_KEYS } from '@/utils/constants'
 
 interface StoredState {
-  images: ImageItem[]
-  groups: ImageGroup[]
+  images: ImageItemMeta[]
+  groups: GroupMeta[]
   settings: AppSettings
 }
 

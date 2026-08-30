@@ -62,6 +62,8 @@ export const Events = {
   PROCESSING_PROGRESS: 'processing:progress',
   PROCESSING_COMPLETED: 'processing:completed',
   PROCESSING_ERROR: 'processing:error',
+  STITCH_COMPLETE: 'stitch:complete',
+  ACTION_STITCH: 'action:stitch',
 
   // UI events
   THEME_CHANGED: 'ui:theme-changed',

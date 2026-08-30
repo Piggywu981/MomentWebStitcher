@@ -1,4 +1,11 @@
-import type { AppState as IAppState, ImageItem, ImageGroup, AppSettings } from '@/types'
+import type {
+  AppState as IAppState,
+  ImageItem,
+  ImageGroup,
+  ImageItemMeta,
+  GroupMeta,
+  AppSettings,
+} from '@/types'
 import { DEFAULT_SETTINGS } from '@/utils/constants'
 import {
   CommandManager,
@@ -8,6 +15,7 @@ import {
   createDeleteGroupCommand,
   createAddToGroupCommand,
   createRemoveFromGroupCommand,
+  createClearGroupCommand,
   createClearAllCommand,
 } from './commands'
 import { eventBus, Events } from './events'
@@ -33,12 +41,14 @@ export class AppState implements IAppState {
   addImages(images: ImageItem[]): void {
     const command = createAddImagesCommand(this, images)
     this.commandManager.execute(command)
+    this.saveToStorage()
     eventBus.emit(Events.IMAGES_ADDED, images)
   }
 
   removeImage(imageId: string): void {
     const command = createRemoveImageCommand(this, imageId)
     this.commandManager.execute(command)
+    this.saveToStorage()
     eventBus.emit(Events.IMAGES_REMOVED, imageId)
   }
 
@@ -51,6 +61,7 @@ export class AppState implements IAppState {
     }
     const command = createCreateGroupCommand(this, group)
     this.commandManager.execute(command)
+    this.emitChange()
     eventBus.emit(Events.GROUP_CREATED, group)
     return group
   }
@@ -58,19 +69,30 @@ export class AppState implements IAppState {
   deleteGroup(groupId: string): void {
     const command = createDeleteGroupCommand(this, groupId)
     this.commandManager.execute(command)
+    this.emitChange()
     eventBus.emit(Events.GROUP_DELETED, groupId)
   }
 
   addImageToGroup(groupId: string, image: ImageItem, position?: number): void {
     const command = createAddToGroupCommand(this, groupId, image, position)
     this.commandManager.execute(command)
+    this.emitChange()
     eventBus.emit(Events.IMAGE_ADDED_TO_GROUP, { groupId, image })
   }
 
   removeImageFromGroup(groupId: string, imageId: string): void {
     const command = createRemoveFromGroupCommand(this, groupId, imageId)
     this.commandManager.execute(command)
+    this.emitChange()
     eventBus.emit(Events.IMAGE_REMOVED_FROM_GROUP, { groupId, imageId })
+  }
+
+  clearGroupImages(groupId: string): void {
+    const command = createClearGroupCommand(this, groupId)
+    this.commandManager.execute(command)
+    this.emitChange()
+    const group = this.groups.find((g) => g.id === groupId)
+    if (group) eventBus.emit(Events.GROUP_UPDATED, group)
   }
 
   reorderGroupImages(groupId: string, oldIndex: number, newIndex: number): void {
@@ -98,6 +120,7 @@ export class AppState implements IAppState {
       })
     }
     this.emitChange()
+    eventBus.emit(Events.GROUP_UPDATED)
   }
 
   // Processing
@@ -153,24 +176,35 @@ export class AppState implements IAppState {
     try {
       const savedState = await storage.getState()
       if (savedState) {
-        // Convert dateTime strings back to Date objects
-        this.images = (savedState.images || []).map((img) => ({
-          ...img,
-          dateTime: new Date(img.dateTime),
-        }))
+        // Rebuild full images from IndexedDB (photo data lives there, not in localStorage)
+        const restoredImages: ImageItem[] = []
+        for (const meta of savedState.images || []) {
+          const img = await storage.getImage(meta.id)
+          if (img) {
+            restoredImages.push({ ...img, dateTime: new Date(img.dateTime) })
+          }
+        }
+        this.images = restoredImages
+
         this.groups = (savedState.groups || []).map((group) => ({
-          ...group,
-          images: group.images.map((img) => ({
-            ...img,
-            dateTime: new Date(img.dateTime),
-          })),
+          id: group.id,
+          name: group.name,
+          images: (group.imageIds || [])
+            .map((id) => this.images.find((img) => img.id === id))
+            .filter((img): img is ImageItem => !!img),
         }))
+
         this.settings = { ...DEFAULT_SETTINGS, ...savedState.settings }
       }
 
       const savedSettings = await storage.getSettings()
       if (savedSettings) {
         this.settings = { ...this.settings, ...savedSettings }
+      }
+
+      if (savedState) {
+        eventBus.emit(Events.IMAGES_ADDED)
+        eventBus.emit(Events.GROUP_UPDATED)
       }
     } catch (error) {
       console.error('Failed to load from storage:', error)
@@ -179,11 +213,20 @@ export class AppState implements IAppState {
 
   async saveToStorage(): Promise<void> {
     try {
-      await storage.saveState({
-        images: this.images,
-        groups: this.groups,
-        settings: this.settings,
-      })
+      const images: ImageItemMeta[] = this.images.map((img) => ({
+        id: img.id,
+        name: img.name,
+        dateTime: img.dateTime.toISOString(),
+        ...(img.width != null ? { width: img.width } : {}),
+        ...(img.height != null ? { height: img.height } : {}),
+      }))
+      const groups: GroupMeta[] = this.groups.map((g) => ({
+        id: g.id,
+        name: g.name,
+        imageIds: g.images.map((img) => img.id),
+      }))
+
+      await storage.saveState({ images, groups, settings: this.settings })
     } catch (error) {
       console.error('Failed to save to storage:', error)
     }
@@ -206,6 +249,7 @@ export class AppState implements IAppState {
   clearAll(): void {
     const command = createClearAllCommand(this)
     this.commandManager.execute(command)
+    this.saveToStorage()
     eventBus.emit(Events.STATE_RESET)
   }
 

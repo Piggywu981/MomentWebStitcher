@@ -9,6 +9,20 @@ export interface ImageItem {
   thumbnail?: string
 }
 
+export interface ImageItemMeta {
+  id: string
+  name: string
+  dateTime: string
+  width?: number
+  height?: number
+}
+
+export interface GroupMeta {
+  id: string
+  name: string
+  imageIds: string[]
+}
+
 export interface ImageGroup {
   id: string
   name: string
@@ -54,6 +68,7 @@ export type CommandType =
   | 'ADD_TO_GROUP'
   | 'REMOVE_FROM_GROUP'
   | 'REORDER_GROUP'
+  | 'CLEAR_GROUP'
   | 'CLEAR_ALL'
   | 'UPDATE_SETTINGS'
 

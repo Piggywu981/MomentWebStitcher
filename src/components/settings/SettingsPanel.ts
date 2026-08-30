@@ -72,7 +72,7 @@ export function createSettingsPanel(): HTMLDivElement {
         showToast({ message: '请先创建分组', type: 'warning' })
         return
       }
-      eventBus.emit('action:stitch')
+      eventBus.emit(Events.ACTION_STITCH)
     },
   })
   actionsGrid.appendChild(stitchBtn)

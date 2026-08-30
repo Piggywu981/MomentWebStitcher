@@ -5,8 +5,9 @@ import { createUploadArea } from '@/components/upload/UploadArea'
 import { createImagePool } from '@/components/image-pool/ImagePool'
 import { createGroupManager } from '@/components/group-manager/GroupManager'
 import { createSettingsPanel } from '@/components/settings/SettingsPanel'
+import { createResultsPanel } from '@/components/results/ResultsPanel'
 import { createProgress, showToast } from '@/components/common/Button'
-import { downloadBlob } from '@/utils/helpers'
+import type { StitchResult } from '@/types'
 import '@/styles/variables.css'
 import '@/styles/animations.css'
 
@@ -85,6 +86,12 @@ function initApp(): void {
   groupSection.appendChild(createGroupManager())
   leftColumn.appendChild(groupSection)
 
+  // Results panel (in left column so the sticky settings sidebar never overlaps it)
+  const resultsSection = document.createElement('section')
+  resultsSection.className = 'bg-surface rounded-2xl p-6 shadow-sm border border-border'
+  resultsSection.appendChild(createResultsPanel())
+  leftColumn.appendChild(resultsSection)
+
   grid.appendChild(leftColumn)
 
   // Right column - Settings
@@ -157,13 +164,15 @@ function setupEventListeners(): void {
   })
 
   // Stitch action
-  eventBus.on('action:stitch', async () => {
+  eventBus.on(Events.ACTION_STITCH, async () => {
     if (appState.groups.length === 0) {
       showToast({ message: '请先创建分组', type: 'warning' })
       return
     }
 
     appState.setProcessing(true)
+
+    const results: Array<StitchResult & { groupName: string }> = []
 
     try {
       for (let i = 0; i < appState.groups.length; i++) {
@@ -187,14 +196,15 @@ function setupEventListeners(): void {
           }
         )
 
-        // Download
-        downloadBlob(
-          result.blob,
-          `stitched_${group.name}_${Date.now()}.${appState.settings.outputFormat}`
-        )
+        results.push({
+          ...result,
+          groupName: group.name,
+          filename: `${group.name}_${Date.now()}.${appState.settings.outputFormat}`,
+        })
       }
 
-      showToast({ message: '所有分组处理完成', type: 'success' })
+      eventBus.emit(Events.STITCH_COMPLETE, results)
+      showToast({ message: `处理完成，共 ${results.length} 个结果`, type: 'success' })
     } catch (error) {
       console.error('Stitching error:', error)
       showToast({
@@ -229,7 +239,7 @@ function setupKeyboardShortcuts(): void {
     // Ctrl/Cmd + Enter - Stitch
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault()
-      eventBus.emit('action:stitch')
+      eventBus.emit(Events.ACTION_STITCH)
     }
 
     // Ctrl/Cmd + O - Add images

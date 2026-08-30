@@ -111,8 +111,11 @@ export function createImagePool(): HTMLDivElement {
   eventBus.on(Events.IMAGES_REMOVED, updateGrid)
   eventBus.on(Events.GROUP_CREATED, updateGrid)
   eventBus.on(Events.GROUP_DELETED, updateGrid)
+  eventBus.on(Events.GROUP_UPDATED, updateGrid)
   eventBus.on(Events.IMAGE_ADDED_TO_GROUP, updateGrid)
   eventBus.on(Events.IMAGE_REMOVED_FROM_GROUP, updateGrid)
+  eventBus.on(Events.UNDO, updateGrid)
+  eventBus.on(Events.REDO, updateGrid)
   eventBus.on(Events.STATE_RESET, updateGrid)
 
   // Initial render
@@ -178,7 +181,7 @@ function createImageCard(image: ImageItem, index: number): HTMLDivElement {
 
   overlay.innerHTML = `
     <p class="text-white text-xs font-medium truncate">${image.name}</p>
-    <p class="text-white/70 text-xs">${formatFileSize(image.file.size)}</p>
+    <p class="text-white/70 text-xs">${formatFileSize(image.file?.size ?? 0)}</p>
   `
   card.appendChild(overlay)
 
@@ -224,7 +227,7 @@ function createImageCard(image: ImageItem, index: number): HTMLDivElement {
   })
 
   // Tooltip on hover
-  card.title = `${image.name}\n${formatDate(image.dateTime)}\n${formatFileSize(image.file.size)}`
+  card.title = `${image.name}\n${formatDate(image.dateTime)}\n${formatFileSize(image.file?.size ?? 0)}`
 
   return card
 }
